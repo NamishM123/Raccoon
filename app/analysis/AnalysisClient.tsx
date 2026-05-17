@@ -106,6 +106,8 @@ export function AnalysisClient() {
 
 // ── Upload + analysis orchestrator ────────────────────────────────────────────
 
+const SESSION_ACTIVE_KEY = "seagull_analysis_active_id";
+
 function UploadAndAnalyze({ profile }: { profile: Profile }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -116,9 +118,26 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<AnalysisMeta[]>([]);
 
+  // On mount: load history, then restore the last-viewed analysis from sessionStorage
   useEffect(() => {
-    listAnalyses().then(setHistory).catch(() => {});
+    listAnalyses().then(async (list) => {
+      setHistory(list);
+      const storedId = sessionStorage.getItem(SESSION_ACTIVE_KEY);
+      if (storedId && list.some(h => h.id === storedId)) {
+        const record = await getAnalysis(storedId);
+        if (record) {
+          setResult(record.result as AnalysisResult);
+          setActiveId(storedId);
+        }
+      }
+    }).catch(() => {});
   }, []);
+
+  // Keep sessionStorage in sync so navigation away and back restores the view
+  useEffect(() => {
+    if (activeId) sessionStorage.setItem(SESSION_ACTIVE_KEY, activeId);
+    else sessionStorage.removeItem(SESSION_ACTIVE_KEY);
+  }, [activeId]);
 
   function pickFile(f: File | null) {
     setError(null);
@@ -131,6 +150,8 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
     setResult(record.result as AnalysisResult);
     setActiveId(id);
     setFile(null);
+    // Scroll down so the results are visible after clicking a history row
+    setTimeout(() => window.scrollBy({ top: 300, behavior: "smooth" }), 50);
   }
 
   async function handleDelete(id: string) {
