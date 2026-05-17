@@ -10,12 +10,15 @@ function encodePayload(profile: Profile, reason: string, goals: string[]): strin
   const slim = {
     profile: {
       display_name: profile.display_name,
+      legal_name: profile.legal_name,
       pronouns: profile.pronouns,
       age: profile.age,
       sex_assigned_at_birth: profile.sex_assigned_at_birth,
       allergies: profile.allergies,
       anatomical_inventory: profile.anatomical_inventory,
       hormone_regimen_summary: profile.hormone_regimen_summary,
+      medications: profile.medications,
+      patient_preferences: profile.patient_preferences,
     },
     reason,
     goals: goals.filter((g) => g.trim()),
@@ -41,8 +44,15 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
     const [qr, setQr] = useState<string>("");
 
     const allergies = profile.allergies.filter((a) => a.substance.trim());
-    const name = profile.display_name.trim() || "Patient";
+    const displayName = profile.display_name.trim();
+    const legalName = profile.legal_name.trim();
+    const name = displayName || legalName || "Patient";
+    const showLegal =
+      !!legalName && (!displayName || legalName.toLowerCase() !== displayName.toLowerCase());
     const pronouns = profile.pronouns.trim();
+    const meds = profile.medications
+      .map((m) => m.description.trim())
+      .filter(Boolean);
     const filledGoals = goals.map((g) => g.trim()).filter(Boolean);
 
     useEffect(() => {
@@ -121,6 +131,11 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
             </span>
           )}
         </div>
+        {showLegal && (
+          <div style={{ marginTop: 2, fontSize: 11, opacity: 0.78 }}>
+            Legal: <span style={{ fontWeight: 600, opacity: 0.95 }}>{legalName}</span>
+          </div>
+        )}
         {demoBits.length > 0 && (
           <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8 }}>{demoBits.join(" · ")}</div>
         )}
@@ -154,8 +169,8 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
         <div style={{ marginTop: 12, fontSize: 10, letterSpacing: 2, opacity: 0.7, fontWeight: 700 }}>
           TODAY
         </div>
-        <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.35, opacity: 0.95 }}>
-          {reason.trim() || ""}
+        <div style={{ marginTop: 2, fontSize: 13, fontWeight: 600, lineHeight: 1.35, opacity: 0.98 }}>
+          {reason.trim() || "—"}
         </div>
 
         {filledGoals.length > 0 && (
@@ -166,6 +181,32 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
               </div>
             ))}
           </div>
+        )}
+
+        {/* Medications — what the patient is currently on, with whatever dose
+            they put in the free-text line. */}
+        {meds.length > 0 && (
+          <>
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 10,
+                letterSpacing: 2,
+                opacity: 0.7,
+                fontWeight: 700,
+              }}
+            >
+              MEDS
+            </div>
+            <div style={{ marginTop: 2, fontSize: 11, lineHeight: 1.35, opacity: 0.92 }}>
+              {meds.slice(0, 4).map((m, i) => (
+                <div key={i}>· {m}</div>
+              ))}
+              {meds.length > 4 && (
+                <div style={{ opacity: 0.7 }}>+ {meds.length - 4} more — scan QR</div>
+              )}
+            </div>
+          </>
         )}
 
         {/* QR — bottom strip */}
