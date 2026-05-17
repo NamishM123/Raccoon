@@ -304,34 +304,29 @@ function TimelineGrid({ items }: { items: TimelineItem[] }) {
             key={i}
             index={i}
             item={item}
-            onOpen={() => setActiveIndex(i)}
+            isActive={activeIndex === i}
+            onOpen={() => setActiveIndex(activeIndex === i ? null : i)}
           />
         ))}
       </div>
 
-      {/* Drawer backdrop */}
-      {activeItem && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
-          onClick={() => setActiveIndex(null)}
-          aria-hidden
-        />
-      )}
-
-      {/* Drawer panel */}
+      {/* Drawer panel — no backdrop, everything behind stays interactive */}
       <div
         className={cn(
-          "fixed top-0 right-0 bottom-0 z-50 w-full max-w-md glass-strong flex flex-col",
+          "fixed top-16 right-0 bottom-0 z-30 w-full max-w-md flex flex-col",
+          "border-l border-white/50",
+          "shadow-[-8px_0_32px_rgba(15,35,55,0.12)]",
+          "bg-white/80 backdrop-blur-xl",
           "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
           activeItem ? "translate-x-0" : "translate-x-full"
         )}
-        aria-modal="true"
-        role="dialog"
+        role="complementary"
+        aria-label="Section detail"
       >
         {activeItem && (
           <>
             {/* Drawer header */}
-            <div className="flex items-start justify-between gap-4 px-7 pt-7 pb-5 border-b border-white/40">
+            <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4 border-b border-black/[0.06]">
               <div className="flex items-center gap-3">
                 <div className="h-7 w-7 shrink-0 rounded-full bg-brand/15 text-brand text-meta font-bold flex items-center justify-center">
                   {activeIndex! + 1}
@@ -349,19 +344,19 @@ function TimelineGrid({ items }: { items: TimelineItem[] }) {
               </button>
             </div>
 
-            {/* Drawer body */}
-            <div className="flex-1 overflow-y-auto px-7 py-6">
+            {/* Drawer body — terms shown as cards, no hover tooltips to avoid clipping */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <p className="text-meta text-ink-secondary leading-relaxed">
-                <AnnotatedText text={activeItem.plain} terms={activeItem.terms} bold />
+                <AnnotatedText text={activeItem.plain} terms={[]} bold />
               </p>
 
               {activeItem.terms.length > 0 && (
                 <div className="mt-6 flex flex-col gap-3">
-                  <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-ink-secondary/60">
+                  <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-ink-secondary/50">
                     Terms in this section
                   </p>
                   {activeItem.terms.map((t, i) => (
-                    <div key={i} className="glass-inset rounded-card px-4 py-3">
+                    <div key={i} className="rounded-xl border border-black/[0.06] bg-white/60 px-4 py-3">
                       <p className="text-meta font-semibold text-ink-primary">{t.word}</p>
                       <p className="mt-0.5 text-meta text-ink-secondary leading-relaxed">{t.explanation}</p>
                     </div>
@@ -379,10 +374,12 @@ function TimelineGrid({ items }: { items: TimelineItem[] }) {
 function TimelineCard({
   index,
   item,
+  isActive,
   onOpen,
 }: {
   index: number;
   item: TimelineItem;
+  isActive: boolean;
   onOpen: () => void;
 }) {
   const [clickFlash, setClickFlash] = useState(false);
@@ -394,7 +391,12 @@ function TimelineCard({
   }
 
   return (
-    <div className="glass rounded-card p-6 flex gap-5 h-full">
+    <div
+      className={cn(
+        "glass rounded-card p-6 flex gap-5 h-full transition-shadow duration-200",
+        isActive && "ring-1 ring-brand/40"
+      )}
+    >
       <div className="flex-shrink-0 flex items-start pt-0.5">
         <div className="h-7 w-7 rounded-full bg-brand/15 text-brand text-meta font-bold flex items-center justify-center">
           {index + 1}
@@ -407,12 +409,14 @@ function TimelineCard({
             onClick={handleOpen}
             className={cn(
               "shrink-0 text-meta transition-colors duration-150 select-none whitespace-nowrap",
-              clickFlash
-                ? "animate-show-more-click"
-                : "text-ink-secondary hover:text-brand"
+              isActive
+                ? "text-brand"
+                : clickFlash
+                  ? "animate-show-more-click"
+                  : "text-ink-secondary hover:text-brand"
             )}
           >
-            Show more…
+            {isActive ? "Show less" : "Show more…"}
           </button>
         </div>
       </div>
