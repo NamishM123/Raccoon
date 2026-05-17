@@ -16,7 +16,7 @@ import { PageHero } from "@/components/PageHero";
 import { cn } from "@/lib/cn";
 import { emptyProfile, loadProfile, type LabValue, type Profile } from "@/lib/profile";
 import { listAnalyses, getAnalysis } from "@/lib/analysisStore";
-import { FlaskConical, Plus, TrendingUp, X } from "lucide-react";
+import { AlertTriangle, FlaskConical, Plus, TrendingUp, X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -425,6 +425,25 @@ function MetricChart({ metric, hypothetical, highlighted = false }: {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      {projStatus === "at-risk" && (
+        <div className="mt-3 rounded-card bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="text-meta leading-relaxed">
+            <div className="text-red-700 font-semibold">
+              This pattern isn&apos;t normal — talk to a doctor.
+            </div>
+            <p className="text-red-700/80 mt-0.5">
+              {metric.name} is trending outside the typical range
+              {metric.normalLow !== undefined && metric.normalHigh !== undefined
+                ? ` (${metric.normalLow}–${metric.normalHigh} ${metric.unit})`
+                : ""}{" "}
+              and projection stays out. Bring this chart to your next visit, or
+              reach out sooner if you&apos;re also feeling off.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-secondary">

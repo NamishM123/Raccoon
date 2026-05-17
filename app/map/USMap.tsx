@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ComposableMap,
   Geographies,
@@ -44,6 +44,42 @@ export function USMap({
     y: number;
   } | null>(null);
 
+  const DWELL_MS = 2500;
+  const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dwellStartRef = useRef<number>(0);
+  const dwellRafRef = useRef<number | null>(null);
+  const [dwellProgress, setDwellProgress] = useState(0); // 0..1 for the active state
+
+  function clearDwell() {
+    if (dwellTimerRef.current) {
+      clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+    if (dwellRafRef.current !== null) {
+      cancelAnimationFrame(dwellRafRef.current);
+      dwellRafRef.current = null;
+    }
+    setDwellProgress(0);
+  }
+
+  function startDwell(code: string) {
+    clearDwell();
+    dwellStartRef.current = performance.now();
+    const tick = () => {
+      const elapsed = performance.now() - dwellStartRef.current;
+      const p = Math.min(1, elapsed / DWELL_MS);
+      setDwellProgress(p);
+      if (p < 1) dwellRafRef.current = requestAnimationFrame(tick);
+    };
+    dwellRafRef.current = requestAnimationFrame(tick);
+    dwellTimerRef.current = setTimeout(() => {
+      onSelect(code);
+      clearDwell();
+    }, DWELL_MS);
+  }
+
+  useEffect(() => () => clearDwell(), []);
+
   return (
     <div className="relative">
       <ComposableMap projection="geoAlbersUsa" width={980} height={560}>
@@ -86,9 +122,17 @@ export function USMap({
                       x: rect.left - (parentRect?.left || 0) + rect.width / 2,
                       y: rect.top - (parentRect?.top || 0),
                     });
+                    startDwell(state.state_code);
                   }}
-                  onMouseLeave={() => setHover(null)}
-                  onClick={() => state && status && onSelect(state.state_code)}
+                  onMouseLeave={() => {
+                    setHover(null);
+                    clearDwell();
+                  }}
+                  onClick={() => {
+                    if (!state || !status) return;
+                    clearDwell();
+                    onSelect(state.state_code);
+                  }}
                   style={{
                     default: {
                       fill,
@@ -124,13 +168,23 @@ export function USMap({
 
       {hover && (
         <div
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-btn bg-ink-primary text-white px-3 py-1.5 text-meta whitespace-nowrap shadow-card"
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-btn bg-ink-primary text-white px-3 py-1.5 text-meta whitespace-nowrap shadow-card flex items-center gap-2"
           style={{ left: hover.x, top: hover.y - 6 }}
         >
           <span className="font-medium">{hover.name}</span>
           <span className="text-white/70">
-            {" "}· {INSURANCE_LABELS[insurance]} · {statusLabel(hover.status)}
+            · {INSURANCE_LABELS[insurance]} · {statusLabel(hover.status)}
           </span>
+          {dwellProgress > 0 && dwellProgress < 1 && (
+            <span
+              aria-hidden
+              className="relative inline-block h-3.5 w-3.5 rounded-full"
+              style={{
+                background: `conic-gradient(#FFFFFF ${dwellProgress * 360}deg, rgba(255,255,255,0.2) 0)`,
+              }}
+              title="Hold to open"
+            />
+          )}
         </div>
       )}
     </div>
