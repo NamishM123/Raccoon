@@ -1,8 +1,8 @@
 "use client";
 
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Printer, ClipboardList, Download, Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { Printer, ClipboardList, Download, Sparkles, Loader2, RefreshCw, ChevronDown } from "lucide-react";
 import { toPng } from "html-to-image";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
@@ -43,6 +43,30 @@ interface Brief {
   framing_note: string;
 }
 
+interface ComplaintHistory {
+  onset: string;
+  character: string;
+  severity: string;
+  better: string;
+  worse: string;
+  prior: string;
+}
+
+function emptyHistory(): ComplaintHistory {
+  return { onset: "", character: "", severity: "", better: "", worse: "", prior: "" };
+}
+
+function hasAnyHistory(h: ComplaintHistory): boolean {
+  return (
+    !!h.onset.trim() ||
+    !!h.character.trim() ||
+    !!h.severity.trim() ||
+    !!h.better.trim() ||
+    !!h.worse.trim() ||
+    !!h.prior.trim()
+  );
+}
+
 export function DocumentClient() {
   const [profile, setProfile] = useState<Profile>(emptyProfile());
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
@@ -51,6 +75,8 @@ export function DocumentClient() {
     .filter(Boolean)
     .join(" ");
   const [extraContext, setExtraContext] = useState("");
+  const [history, setHistory] = useState<ComplaintHistory>(emptyHistory());
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [goals, setGoals] = useState<string[]>(["", "", ""]);
   const [mode, setMode] = useState<Mode>("full");
   const [audience, setAudience] = useState<Audience>("clinician");
@@ -66,6 +92,7 @@ export function DocumentClient() {
     r: reason.trim(),
     g: goals.map((g) => g.trim()).filter(Boolean),
     x: extraContext.trim(),
+    h: history,
   });
   const briefIsStale = brief !== null && briefKey !== currentKey;
 
@@ -206,6 +233,75 @@ export function DocumentClient() {
                   placeholder="In your own words. e.g. My arm has been hurting for three days after I fell off my bike."
                   className="mt-4 w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen((o) => !o)}
+                  className="mt-4 flex items-center gap-2 text-meta text-ink-secondary hover:text-ink-primary"
+                >
+                  <ChevronDown
+                    className={
+                      "h-4 w-4 transition-transform " +
+                      (historyOpen ? "rotate-180" : "")
+                    }
+                  />
+                  Add details (saves the doctor 60 seconds of questions)
+                </button>
+                {historyOpen && (
+                  <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                    <HistoryField
+                      label="When did it start?"
+                      placeholder="3 days ago, after lifting boxes"
+                      value={history.onset}
+                      onChange={(v) => setHistory((h) => ({ ...h, onset: v }))}
+                    />
+                    <HistoryField
+                      label="What does it feel like?"
+                      placeholder="Sharp, dull, throbbing, burning…"
+                      value={history.character}
+                      onChange={(v) => setHistory((h) => ({ ...h, character: v }))}
+                    />
+                    <div>
+                      <div className="text-meta uppercase tracking-[0.1em] text-ink-secondary font-bold">
+                        Severity at worst (0–10)
+                      </div>
+                      <div className="mt-2 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0}
+                          max={10}
+                          step={1}
+                          value={history.severity === "" ? 0 : Number(history.severity)}
+                          onChange={(e) =>
+                            setHistory((h) => ({ ...h, severity: e.target.value }))
+                          }
+                          className="flex-1 accent-accent"
+                        />
+                        <span className="text-body font-bold text-ink-primary w-8 text-right">
+                          {history.severity === "" ? "—" : history.severity}
+                        </span>
+                      </div>
+                    </div>
+                    <HistoryField
+                      label="Have you had this before?"
+                      placeholder="Yes, similar episode in March. / No."
+                      value={history.prior}
+                      onChange={(v) => setHistory((h) => ({ ...h, prior: v }))}
+                    />
+                    <HistoryField
+                      label="What makes it better?"
+                      placeholder="Rest, ibuprofen, ice…"
+                      value={history.better}
+                      onChange={(v) => setHistory((h) => ({ ...h, better: v }))}
+                    />
+                    <HistoryField
+                      label="What makes it worse?"
+                      placeholder="Lifting overhead, lying flat, stress…"
+                      value={history.worse}
+                      onChange={(v) => setHistory((h) => ({ ...h, worse: v }))}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="glass rounded-card p-7">
@@ -394,6 +490,7 @@ export function DocumentClient() {
                   <PrintableCard
                     profile={profile}
                     reason={reason}
+                    history={history}
                     extraContext={extraContext}
                     goals={goals}
                     brief={briefIsStale ? null : brief}
@@ -451,38 +548,81 @@ export function DocumentClient() {
             background: white !important;
             color: #0a0a0a !important;
           }
+          /* Hide everything except the path to .printable-card.
+             :has(.printable-card) is true for every ancestor of the card,
+             so they stay laid out (display: revert). The card and its
+             descendants are explicitly re-shown below. */
+          body *:not(:has(.printable-card)):not(.printable-card) {
+            display: none !important;
+          }
+          body:has(.printable-card),
+          *:has(.printable-card) {
+            display: block !important;
+            position: static !important;
+            transform: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: white !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            grid-template-columns: none !important;
+            grid-template-rows: none !important;
+            column-gap: 0 !important;
+            row-gap: 0 !important;
+            gap: 0 !important;
+          }
+          /* Pseudo-elements on .page-ocean would otherwise paint over. */
           .page-ocean::before,
           .page-ocean::after {
             display: none !important;
-          }
-          body * {
-            visibility: hidden !important;
+            content: none !important;
           }
           .printable-card,
           .printable-card * {
-            visibility: visible !important;
+            display: revert !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           .printable-card {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
+            position: static !important;
             margin: 0 !important;
+            padding: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
-            padding: 0 !important;
+            background: white !important;
             box-shadow: none !important;
             border: none !important;
-            background: white !important;
             -webkit-backdrop-filter: none !important;
             backdrop-filter: none !important;
             font-size: 10.5pt;
-            line-height: 1.35;
+            line-height: 1.4;
             color: #0a0a0a;
           }
-          /* Keep each section together; only break between them when needed. */
+          /* Re-establish flex/grid display on internal layout helpers that
+             may have been clobbered by the ancestor reset. */
+          .printable-card .flex {
+            display: flex !important;
+          }
+          .printable-card .grid {
+            display: grid !important;
+          }
+          .printable-card ul {
+            display: block !important;
+          }
+          .printable-card ol {
+            display: block !important;
+          }
+          .printable-card li {
+            display: list-item !important;
+          }
+          /* Sections shouldn't split across pages. */
           .printable-card > * {
             break-inside: avoid;
             page-break-inside: avoid;
@@ -493,17 +633,21 @@ export function DocumentClient() {
             break-after: avoid;
             page-break-after: avoid;
           }
-          .printable-card ul,
-          .printable-card ol {
-            break-inside: avoid;
-            page-break-inside: avoid;
+          /* Pull margins/padding tight for compact one-page output. */
+          .printable-card .mt-5 {
+            margin-top: 0.55rem !important;
           }
-          /* Pull headings tight to their content. */
           .printable-card .mt-4 {
-            margin-top: 0.5rem !important;
+            margin-top: 0.45rem !important;
           }
           .printable-card .mt-3 {
-            margin-top: 0.4rem !important;
+            margin-top: 0.35rem !important;
+          }
+          .printable-card .mt-2 {
+            margin-top: 0.25rem !important;
+          }
+          .printable-card .pt-4 {
+            padding-top: 0.4rem !important;
           }
           .printable-card .p-8 {
             padding: 0 !important;
@@ -517,7 +661,6 @@ export function DocumentClient() {
           .printable-card .p-3 {
             padding: 0.35rem 0.5rem !important;
           }
-          /* Anti-clobber: links and dates shouldn't be loud in print. */
           .printable-card a {
             color: inherit !important;
             text-decoration: none !important;
@@ -528,22 +671,50 @@ export function DocumentClient() {
   );
 }
 
+function HistoryField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="text-meta uppercase tracking-[0.1em] text-ink-secondary font-bold">
+        {label}
+      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
+      />
+    </div>
+  );
+}
+
 const PrintableCard = forwardRef<
   HTMLDivElement,
   {
     profile: Profile;
     reason: string;
+    history: ComplaintHistory;
     extraContext: string;
     goals: string[];
     brief: Brief | null;
     audience: Audience;
   }
 >(function PrintableCard(
-  { profile, reason, extraContext, goals, brief, audience },
+  { profile, reason, history, extraContext, goals, brief, audience },
   ref
 ) {
   const showAIExtras = audience === "patient";
   const name = profile.display_name.trim();
+  const legalName = profile.legal_name.trim();
   const pronouns = profile.pronouns.trim();
   const age = profile.age.trim();
   const sex = profile.sex_assigned_at_birth;
@@ -552,7 +723,22 @@ const PrintableCard = forwardRef<
   const regimen = profile.hormone_regimen_summary.trim();
   const allergies = profile.allergies.filter((a) => a.substance.trim());
   const inventory = profile.anatomical_inventory.trim();
+  const preferences = profile.patient_preferences.trim();
+  const labs = (profile.recent_labs || []).filter(
+    (l) => l.name.trim() && l.value.trim()
+  );
   const filledGoals = goals.map((g) => g.trim()).filter(Boolean);
+  const historyRows: Array<[string, string]> = [
+    ["Onset", history.onset.trim()],
+    ["Character", history.character.trim()],
+    [
+      "Severity",
+      history.severity.trim() ? `${history.severity.trim()}/10` : "",
+    ],
+    ["Better with", history.better.trim()],
+    ["Worse with", history.worse.trim()],
+    ["Prior episodes", history.prior.trim()],
+  ].filter(([, v]) => !!v) as Array<[string, string]>;
 
   const regimenYears = hormoneDuration(regimen);
   const screenings = screeningReminders(profile);
@@ -574,13 +760,18 @@ const PrintableCard = forwardRef<
             Previsit Card
           </div>
           <div className="mt-1 text-card">
-            {name || "Patient"}
+            {name || legalName || "Patient"}
             {pronouns && (
               <span className="ml-2 text-meta text-ink-secondary font-normal">
                 ({pronouns})
               </span>
             )}
           </div>
+          {legalName && name && legalName.toLowerCase() !== name.toLowerCase() && (
+            <div className="mt-0.5 text-meta text-ink-secondary">
+              Legal: <span className="text-ink-primary">{legalName}</span>
+            </div>
+          )}
           {demographicBits.length > 0 && (
             <div className="mt-0.5 text-meta text-ink-secondary">
               {demographicBits.join(" · ")}
@@ -639,6 +830,18 @@ const PrintableCard = forwardRef<
         </div>
       )}
 
+      {/* Patient-set preferences / boundaries — short, prominent. */}
+      {preferences && (
+        <div className="mt-3 rounded-card border border-divider bg-surface-inset/40 p-3">
+          <span className="text-meta uppercase tracking-[0.12em] text-ink-secondary font-bold">
+            Preferences ·{" "}
+          </span>
+          <span className="text-meta text-ink-primary whitespace-pre-wrap">
+            {preferences}
+          </span>
+        </div>
+      )}
+
       {/* Clinician preamble — short neutral line in clinician view, fuller LLM
           framing in patient view */}
       <div className="mt-4 text-meta text-ink-secondary leading-relaxed">
@@ -669,6 +872,19 @@ const PrintableCard = forwardRef<
         <p className="mt-2 text-body text-ink-primary whitespace-pre-wrap leading-relaxed">
           {reason || "…"}
         </p>
+
+        {historyRows.length > 0 && (
+          <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-meta">
+            {historyRows.map(([k, v]) => (
+              <Fragment key={k}>
+                <dt className="uppercase tracking-[0.1em] text-ink-secondary font-bold">
+                  {k}
+                </dt>
+                <dd className="text-ink-primary">{v}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        )}
 
         {showAIExtras && brief?.clinician_shorthand && (
           <div className="mt-3 rounded-btn bg-accent/5 border border-accent/40 px-3 py-2 font-mono text-meta text-ink-primary">
@@ -752,6 +968,27 @@ const PrintableCard = forwardRef<
           )}
         </div>
       </div>
+
+      {/* Recent labs — already collected, surfaced for reconciliation. */}
+      {labs.length > 0 && (
+        <div className="mt-4 rounded-card border border-divider p-5">
+          <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary font-bold">
+            Recent Labs · Patient Reported
+          </div>
+          <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-meta text-ink-primary">
+            {labs.map((l) => (
+              <li key={l.id}>
+                <span className="font-bold">{l.name}</span>{" "}
+                <span>{l.value}</span>
+                {l.unit && <span> {l.unit}</span>}
+                {l.date && (
+                  <span className="text-ink-secondary"> · {l.date}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Screening reminders — derived, not echoed */}
       {screenings.length > 0 && (
