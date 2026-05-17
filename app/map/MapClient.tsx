@@ -5,7 +5,6 @@ import { CalendarClock } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Pill, StatusPill } from "@/components/Pill";
-import { Button } from "@/components/Button";
 import { AuroraOverlay } from "@/components/ui/aurora-background";
 import {
   CARE_STATUS_BY_CODE,
@@ -169,13 +168,6 @@ export function MapClient() {
               </a>{" "}
               before acting on anything you see here.
             </p>
-            <div className="pt-2">
-              <Button asChild variant="secondary" size="sm">
-                <a href="mailto:hello@seagull.app?subject=Care%20Map%20error">
-                  Report An Error
-                </a>
-              </Button>
-            </div>
           </div>
         </div>
       </section>
