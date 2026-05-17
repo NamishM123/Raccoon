@@ -12,17 +12,15 @@ import {
   PROCEDURE_LABELS,
   getLastDataUpdate,
 } from "@/data/care_status";
+import {
+  INSURANCE_KEYS,
+  INSURANCE_LABELS,
+  INSURANCE_BLURB,
+  type InsuranceKey,
+} from "@/data/insurance_coverage";
 import type { CareStatus, ProcedureKey } from "@/types";
 import { USMap } from "./USMap";
 import { StateDrawer } from "./StateDrawer";
-
-const INSURANCE_FILTERS = [
-  { id: "employer", label: "Employer" },
-  { id: "marketplace", label: "Marketplace" },
-  { id: "medicaid", label: "Medicaid" },
-  { id: "medicare", label: "Medicare" },
-  { id: "self_pay", label: "Self Pay" },
-];
 
 const STATUS_LEGEND: Array<{ status: CareStatus; description: string }> = [
   {
@@ -43,7 +41,7 @@ const STATUS_LEGEND: Array<{ status: CareStatus; description: string }> = [
 
 export function MapClient() {
   const [procedure, setProcedure] = useState<ProcedureKey>("hrt_adult");
-  const [insurance, setInsurance] = useState<string>("employer");
+  const [insurance, setInsurance] = useState<InsuranceKey>("employer");
   const [activeState, setActiveState] = useState<string | null>(null);
 
   const lastUpdate = useMemo(() => getLastDataUpdate(), []);
@@ -53,7 +51,7 @@ export function MapClient() {
       <AuroraOverlay variant="violet" />
       <PageHero
         title="Where Your State Stands On Gender Affirming Care"
-        description="The legal landscape for HRT, surgery, ID changes, and shield laws across all 50 states."
+        description="Pick a procedure and your insurance — the map recolors to show which states will actually cover the care."
       />
       <Container className="pb-16 relative">
       <div className="glass rounded-card p-7 mb-8 flex items-start gap-4">
@@ -101,16 +99,19 @@ export function MapClient() {
               Insurance
             </div>
             <div className="flex flex-wrap gap-2">
-              {INSURANCE_FILTERS.map((i) => (
+              {INSURANCE_KEYS.map((key) => (
                 <Pill
-                  key={i.id}
-                  onClick={() => setInsurance(i.id)}
-                  selected={insurance === i.id}
+                  key={key}
+                  onClick={() => setInsurance(key)}
+                  selected={insurance === key}
                 >
-                  {i.label}
+                  {INSURANCE_LABELS[key]}
                 </Pill>
               ))}
             </div>
+            <p className="mt-2 text-meta text-ink-secondary leading-relaxed">
+              {INSURANCE_BLURB[insurance]}
+            </p>
           </div>
           <div className="mt-2 pt-3 border-t divider-soft text-meta text-ink-secondary">
             Last comprehensive update:{" "}
@@ -123,6 +124,7 @@ export function MapClient() {
       <div className="glass rounded-card p-4 md:p-8 mb-8">
         <USMap
           procedure={procedure}
+          insurance={insurance}
           onSelect={(code) => setActiveState(code)}
         />
       </div>
@@ -153,8 +155,11 @@ export function MapClient() {
             <p>
               Care Map combines weekly snapshots from the Movement Advancement
               Project, Lambda Legal&apos;s case tracker, KFF, and direct reads
-              of state legislation. Scrapers run weekly; each cell is stamped
-              with its most recent update.
+              of state legislation. Insurance posture (Medicaid, Marketplace,
+              employer, Medicare) is layered on top from MAP&apos;s
+              Medicaid coverage map and state insurance non-discrimination
+              statutes. Each cell&apos;s color is the worse of the procedure
+              status and your insurance&apos;s posture in that state.
             </p>
             <p className="text-ink-secondary">
               The law in some states changes faster than we can rescrape.{" "}
@@ -175,6 +180,7 @@ export function MapClient() {
       {activeState && (
         <StateDrawer
           state={CARE_STATUS_BY_CODE[activeState]}
+          insurance={insurance}
           onClose={() => setActiveState(null)}
         />
       )}

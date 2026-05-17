@@ -5,13 +5,21 @@ import { ChevronDown, X, AlertTriangle } from "lucide-react";
 import { StatusPill } from "@/components/Pill";
 import { Button } from "@/components/Button";
 import { PROCEDURE_KEYS, PROCEDURE_LABELS } from "@/data/care_status";
+import {
+  getCombinedStatus,
+  getCombinedRationale,
+  INSURANCE_LABELS,
+  type InsuranceKey,
+} from "@/data/insurance_coverage";
 import type { ProcedureKey, StateCareData } from "@/types";
 
 export function StateDrawer({
   state,
+  insurance,
   onClose,
 }: {
   state: StateCareData | undefined;
+  insurance: InsuranceKey;
   onClose: () => void;
 }) {
   // Allow Esc to close.
@@ -49,9 +57,23 @@ export function StateDrawer({
           </button>
         </div>
 
-        <div className="px-7 py-6 space-y-4">
+        <div className="px-7 pt-5">
+          <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
+            Coverage shown for
+          </div>
+          <div className="text-card font-medium mt-0.5">
+            {INSURANCE_LABELS[insurance]}
+          </div>
+        </div>
+
+        <div className="px-7 py-5 space-y-4">
           {PROCEDURE_KEYS.map((p) => (
-            <ProcedureRow key={p} procedure={p} state={state} />
+            <ProcedureRow
+              key={p}
+              procedure={p}
+              state={state}
+              insurance={insurance}
+            />
           ))}
         </div>
 
@@ -118,12 +140,16 @@ export function StateDrawer({
 function ProcedureRow({
   procedure,
   state,
+  insurance,
 }: {
   procedure: ProcedureKey;
   state: StateCareData;
+  insurance: InsuranceKey;
 }) {
   const [open, setOpen] = useState(false);
   const data = state.procedures[procedure];
+  const combined = getCombinedStatus(state.state_code, insurance, procedure);
+  const rationale = getCombinedRationale(state.state_code, insurance, procedure);
   return (
     <div className="rounded-btn border border-divider/60">
       <button
@@ -139,7 +165,7 @@ function ProcedureRow({
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <StatusPill status={data.status} />
+          <StatusPill status={combined} />
           <ChevronDown
             className={`h-4 w-4 text-ink-secondary transition-transform ${
               open ? "rotate-180" : ""
@@ -149,6 +175,20 @@ function ProcedureRow({
       </button>
       {open && (
         <div className="px-4 pb-4 text-meta text-ink-secondary border-t divider-soft pt-3 space-y-3">
+          {combined !== data.status && (
+            <div className="flex items-center gap-2 text-ink-primary">
+              <span>Procedure legality:</span>
+              <StatusPill status={data.status} />
+            </div>
+          )}
+          {rationale && (
+            <p>
+              <span className="text-ink-primary font-medium">
+                {INSURANCE_LABELS[insurance]}:
+              </span>{" "}
+              {rationale}
+            </p>
+          )}
           {data.notes && <p>{data.notes}</p>}
           {data.sources.length > 0 && (
             <div>
