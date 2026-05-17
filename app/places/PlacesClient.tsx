@@ -187,8 +187,8 @@ export function PlacesClient() {
             </Section>
 
             <Section
-              title="Anatomical Inventory"
-              subtitle="Tick the body parts you do NOT have. Anything you don't tick is assumed present. Cuts through gendered EHR defaults so the right screenings get ordered."
+              title="Your Body"
+              subtitle="Tap the parts you don't have. Anything you don't tap is assumed present. Cuts through gendered EHR defaults so the right screenings get ordered."
               icon={<span className="text-[1.75rem] leading-none" aria-hidden>🫀</span>}
             >
               <BodyPartGrid
