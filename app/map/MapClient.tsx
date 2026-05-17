@@ -1,15 +1,18 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import { MapPin } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
-import { Pill, StatusPill } from "@/components/Pill";
+import { Pill, StatusPill, statusLabel } from "@/components/Pill";
 import {
+  CARE_STATUS,
   CARE_STATUS_BY_CODE,
   PROCEDURE_KEYS,
   PROCEDURE_LABELS,
   getLastDataUpdate,
 } from "@/data/care_status";
+import { CARE_CENTERS } from "@/data/care_centers";
 import type { CareStatus, ProcedureKey } from "@/types";
 import { USMap } from "./USMap";
 import { StateDrawer } from "./StateDrawer";
@@ -43,8 +46,28 @@ export function MapClient() {
   const [procedure, setProcedure] = useState<ProcedureKey>("hrt_adult");
   const [insurance, setInsurance] = useState<string>("employer");
   const [activeState, setActiveState] = useState<string | null>(null);
+  const [showCenters, setShowCenters] = useState(true);
 
   const lastUpdate = useMemo(() => getLastDataUpdate(), []);
+
+  const stats = useMemo(() => {
+    const counts: Record<CareStatus, number> = {
+      PROTECTED: 0,
+      LEGAL: 0,
+      RESTRICTED: 0,
+      BANNED: 0,
+      IN_LITIGATION: 0,
+    };
+    for (const s of CARE_STATUS) {
+      counts[s.procedures[procedure].status]++;
+    }
+    const total = CARE_STATUS.length;
+    const centersInProtective = CARE_CENTERS.filter((c) => {
+      const status = CARE_STATUS_BY_CODE[c.state_code]?.procedures[procedure].status;
+      return status === "PROTECTED" || status === "LEGAL";
+    }).length;
+    return { counts, total, centersInProtective };
+  }, [procedure]);
 
   return (
     <div className="page-ocean">
@@ -110,8 +133,23 @@ export function MapClient() {
               </div>
             </div>
           </div>
-          <div className="text-meta text-ink-secondary shrink-0">
-            Last comprehensive update: <span className="text-ink-primary">{lastUpdate}</span>
+          <div className="flex flex-col gap-3 shrink-0 lg:items-end">
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showCenters}
+                onChange={(e) => setShowCenters(e.target.checked)}
+                className="h-4 w-4 rounded border-divider"
+              />
+              <span className="inline-flex items-center gap-1.5 text-meta text-ink-primary">
+                <MapPin className="h-3.5 w-3.5 text-[#1D70B8]" />
+                Show care centers
+              </span>
+            </label>
+            <div className="text-meta text-ink-secondary">
+              Last comprehensive update:{" "}
+              <span className="text-ink-primary">{lastUpdate}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -121,8 +159,64 @@ export function MapClient() {
         <USMap
           procedure={procedure}
           onSelect={(code) => setActiveState(code)}
+          showCenters={showCenters}
         />
       </div>
+
+      {/* Statistics */}
+      <section className="glass rounded-card p-7 mb-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
+          <h2 className="text-subsection">
+            By the numbers ·{" "}
+            <span className="text-ink-secondary font-normal">
+              {PROCEDURE_LABELS[procedure]}
+            </span>
+          </h2>
+          <span className="text-meta text-ink-secondary">
+            {stats.total} states + DC tracked
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {(
+            [
+              "PROTECTED",
+              "LEGAL",
+              "RESTRICTED",
+              "BANNED",
+              "IN_LITIGATION",
+            ] as CareStatus[]
+          ).map((status) => {
+            const count = stats.counts[status];
+            const pct = Math.round((count / stats.total) * 100);
+            return (
+              <div
+                key={status}
+                className="rounded-card border border-divider bg-surface-inset/40 p-4"
+              >
+                <StatusPill status={status} />
+                <div className="mt-3 text-section font-bold text-ink-primary leading-none">
+                  {count}
+                </div>
+                <div className="mt-1 text-meta text-ink-secondary">
+                  {pct}% of jurisdictions
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {showCenters && (
+          <div className="mt-5 text-meta text-ink-secondary leading-relaxed">
+            <span className="inline-flex items-center gap-1.5 text-ink-primary">
+              <MapPin className="h-3.5 w-3.5 text-[#1D70B8]" />
+              {CARE_CENTERS.length} sample care centers on the map
+            </span>{" "}
+            · <span className="text-ink-primary">{stats.centersInProtective}</span> sit
+            in states currently <span className="lowercase">{statusLabel("PROTECTED")}</span>{" "}
+            or <span className="lowercase">{statusLabel("LEGAL")}</span> for{" "}
+            {PROCEDURE_LABELS[procedure]}.
+          </div>
+        )}
+      </section>
 
       {/* Legend + methodology */}
       <section className="grid gap-6 lg:grid-cols-2 mb-8">
@@ -139,6 +233,14 @@ export function MapClient() {
                 </span>
               </Fragment>
             ))}
+            <span className="inline-flex items-center gap-2 rounded-chip bg-surface-inset px-3 py-1 text-meta text-ink-primary">
+              <span className="h-2 w-2 rounded-full bg-[#1D70B8] ring-2 ring-white" />
+              Care center
+            </span>
+            <span className="text-meta text-ink-secondary">
+              Sample of gender-affirming care providers. Click a marker to open
+              the state's full breakdown.
+            </span>
           </div>
         </div>
 
