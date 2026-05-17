@@ -12,6 +12,10 @@ Break the visit notes into chronological sections (as the doctor presents them, 
 - "heading": a 3-6 word title
 - "plain": simplified explanation in direct, accessible language. No jargon. Max 3 sentences. Wrap the single most important conclusion or action item in **double asterisks** — e.g. **Recheck in 4 weeks.**, **No medication changes at this time.**, **All values are normal.** — so it can be bolded for the reader.
 - "terms": medical words, drug names, or technical terms that appear exactly as written in "plain". For each: { "word": exact substring from plain, "explanation": 1-2 sentence tooltip }
+- "category": classify this section as one of three values:
+  - "hrt_related" — this section is specifically about gender-affirming hormone therapy (HRT), hormone levels, puberty blockers, or medications/dosing used exclusively in the patient's transition
+  - "unrelated" — this section is about a condition, symptom, screening, or treatment that exists independently of the patient's HRT (e.g. a cold, blood pressure, cholesterol, an injury, dental referral)
+  - "may_interact" — this section is about something that is not exclusively HRT but the patient's HRT regimen may meaningfully affect it (e.g. potassium on spironolactone, liver enzymes on oral estrogen, red blood cell counts on testosterone, a new prescription that could interact with hormones)
 
 PART 2 — COMPARISONS
 CONSOLIDATE related recommendations into single entries — for example, combine multiple minerals or supplements into one "Supplementation" entry, combine multiple lab rechecks into one "Lab monitoring" entry, etc. Aim for the fewest meaningful entries rather than one per sentence.
@@ -22,11 +26,16 @@ For each consolidated comparison entry:
 - "headline": ONE sentence describing WHAT this recommendation is about (e.g. "Bone density monitoring is being added" or "Your hormone levels are being maintained at the current dose") — describe the topic, not the alignment
 - "detail": 2-4 sentences of reasoning. Reference specific values from the patient profile (lab numbers, med names, surgery dates) wherever possible. Wrap the most important conclusion in **double asterisks** — e.g. "**Your dosage will remain the same.**" or "**This does not change your HRT regimen.**" — so it can be bolded for the reader.
 - "terms": medical words or drug names that appear exactly as written in "detail". For each: { "word": exact substring, "explanation": 1-2 sentence tooltip }
+- "category": classify this recommendation using the same three values as above:
+  - "hrt_related" — the recommendation is specifically about the patient's hormone therapy or transition-related medications
+  - "unrelated" — the recommendation is about an independent condition or concern that exists regardless of HRT
+  - "may_interact" — the recommendation is not directly about HRT but the patient's current regimen may affect it or be affected by it
 
 RULES:
 - Mention once (in the first timeline item only) that you are not a doctor and this is not medical advice.
 - Do not invent information not in the document. If something is unclear, omit it.
 - Be calm and direct. Patients are often anxious.
+- When in doubt between "unrelated" and "may_interact", choose "may_interact" — it is better to flag a possible connection than to miss one.
 
 OUTPUT FORMAT — VALID JSON ONLY, NO PROSE BEFORE OR AFTER:
 {
@@ -36,7 +45,8 @@ OUTPUT FORMAT — VALID JSON ONLY, NO PROSE BEFORE OR AFTER:
     {
       "heading": "...",
       "plain": "...",
-      "terms": [{ "word": "exact word as written in plain", "explanation": "..." }]
+      "terms": [{ "word": "exact word as written in plain", "explanation": "..." }],
+      "category": "hrt_related" | "unrelated" | "may_interact"
     }
   ],
   "comparisons": [
@@ -45,7 +55,8 @@ OUTPUT FORMAT — VALID JSON ONLY, NO PROSE BEFORE OR AFTER:
       "alignment": "aligned" | "concern" | "neutral",
       "headline": "...",
       "detail": "...",
-      "terms": [{ "word": "exact word as written in detail", "explanation": "..." }]
+      "terms": [{ "word": "exact word as written in detail", "explanation": "..." }],
+      "category": "hrt_related" | "unrelated" | "may_interact"
     }
   ]
 }
@@ -182,6 +193,9 @@ function extractJson(text: string): AnalysisResult | null {
                   explanation: String(t?.explanation || ""),
                 })).filter((t: { word: string }) => t.word)
               : [],
+            category: (["hrt_related", "unrelated", "may_interact"] as const).includes(item?.category)
+              ? item.category as "hrt_related" | "unrelated" | "may_interact"
+              : "unrelated",
           }))
         : [],
       comparisons: Array.isArray(obj.comparisons)
@@ -198,6 +212,9 @@ function extractJson(text: string): AnalysisResult | null {
                   explanation: String(t?.explanation || ""),
                 })).filter((t: { word: string }) => t.word)
               : [],
+            category: (["hrt_related", "unrelated", "may_interact"] as const).includes(c?.category)
+              ? c.category as "hrt_related" | "unrelated" | "may_interact"
+              : "unrelated",
           }))
         : [],
     };
@@ -215,6 +232,7 @@ interface TimelineItem {
   heading: string;
   plain: string;
   terms: TermDef[];
+  category: "hrt_related" | "unrelated" | "may_interact";
 }
 
 interface Comparison {
@@ -223,6 +241,7 @@ interface Comparison {
   headline: string;
   detail: string;
   terms: TermDef[];
+  category: "hrt_related" | "unrelated" | "may_interact";
 }
 
 interface AnalysisResult {

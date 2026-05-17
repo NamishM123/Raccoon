@@ -16,7 +16,7 @@ import { PageHero } from "@/components/PageHero";
 import { cn } from "@/lib/cn";
 import { emptyProfile, loadProfile, type LabValue, type Profile } from "@/lib/profile";
 import { listAnalyses, getAnalysis } from "@/lib/analysisStore";
-import { AlertTriangle, FlaskConical, Plus, TrendingUp, X } from "lucide-react";
+import { Activity, AlertTriangle, FlaskConical, Plus, TrendingUp, X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -478,26 +478,75 @@ function MetricChart({ metric, hypothetical, highlighted = false }: {
   );
 }
 
-// ── Live Data tab ─────────────────────────────────────────────────────────────
+// ── Metric classification ─────────────────────────────────────────────────────
 
-function LiveDataTab({ metrics, isDemo, highlightedMetric }: {
+// Metrics tracked specifically because of HRT
+const HRT_METRICS = new Set([
+  "estradiol", "estrogen", "e2", "testosterone", "prolactin",
+  "shbg", "lh", "fsh", "dhea", "dheas",
+]);
+
+// Metrics that are general health but may be meaningfully affected by common HRT meds
+const SHARED_METRICS = new Set([
+  "potassium",       // spironolactone → hyperkalemia risk
+  "sodium",          // spiro → hyponatremia risk
+  "creatinine",      // muscle mass changes on T affect baseline
+  "ast", "alt",      // oral estrogen → liver enzyme elevation
+  "hemoglobin", "hematocrit", // testosterone → elevated RBC
+]);
+
+// Returns: "hrt" | "shared" | "general"
+function classifyMetric(name: string): "hrt" | "shared" | "general" {
+  const key = name.toLowerCase().trim();
+  if ([...HRT_METRICS].some(k => key.includes(k))) return "hrt";
+  if ([...SHARED_METRICS].some(k => key === k || key.includes(k))) return "shared";
+  return "general";
+}
+
+const SHARED_IMPACT: Record<string, string> = {
+  potassium:   "Spironolactone (a common HRT medication) can raise potassium levels.",
+  sodium:      "Spironolactone can lower sodium. Worth monitoring alongside your HRT.",
+  creatinine:  "Testosterone changes muscle mass, which affects creatinine baselines.",
+  ast:         "Oral estrogen is metabolized by the liver and can elevate liver enzymes.",
+  alt:         "Oral estrogen is metabolized by the liver and can elevate liver enzymes.",
+  hemoglobin:  "Testosterone therapy often raises red blood cell production, increasing hemoglobin.",
+  hematocrit:  "Testosterone therapy often raises red blood cell production, increasing hematocrit.",
+};
+
+function getSharedImpact(name: string): string | null {
+  const key = name.toLowerCase().trim();
+  return Object.entries(SHARED_IMPACT).find(([k]) => key === k || key.includes(k))?.[1] ?? null;
+}
+
+// ── Live Data tab (HRT) ───────────────────────────────────────────────────────
+
+function HrtTab({ metrics, isDemo, highlightedMetric }: {
   metrics: Metric[];
   isDemo: boolean;
   highlightedMetric?: string;
 }) {
-  const enriched = metrics.map(enrich);
+  const hrtMetrics = metrics.filter(m => classifyMetric(m.name) === "hrt");
+  const display = isDemo ? metrics : hrtMetrics; // demo shows all since they're all HRT
+  const enriched = display.map(enrich);
+
   return (
     <div>
       {isDemo && (
         <div className="mb-6 glass rounded-card px-5 py-4 flex items-start gap-3">
           <FlaskConical className="h-5 w-5 shrink-0 text-brand mt-0.5" />
           <p className="text-meta text-ink-secondary leading-relaxed">
-            No lab data found in your profile or saved analyses. These are sample charts.{" "}
+            No hormone lab data found in your profile or saved analyses. These are sample charts.{" "}
             <a href="/places" className="underline underline-offset-4 text-brand">Add your lab values</a>{" "}
             or upload visit notes on the{" "}
             <a href="/analysis" className="underline underline-offset-4 text-brand">After Visit</a>{" "}
             page to see your real trajectory.
           </p>
+        </div>
+      )}
+      {!isDemo && hrtMetrics.length === 0 && (
+        <div className="glass rounded-card px-5 py-4 text-meta text-ink-secondary">
+          No hormone-specific labs found (estradiol, testosterone, prolactin, etc.).{" "}
+          <a href="/places" className="underline underline-offset-4 text-brand">Add them to your profile</a> or upload visit notes.
         </div>
       )}
       <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
@@ -508,6 +557,57 @@ function LiveDataTab({ metrics, isDemo, highlightedMetric }: {
             highlighted={!!highlightedMetric && m.name.toLowerCase() === highlightedMetric.toLowerCase()}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Non-HRT tab ───────────────────────────────────────────────────────────────
+
+function NonHrtTab({ metrics, highlightedMetric }: {
+  metrics: Metric[];
+  highlightedMetric?: string;
+}) {
+  const nonHrtMetrics = metrics.filter(m => classifyMetric(m.name) !== "hrt");
+  const enriched = nonHrtMetrics.map(enrich);
+
+  if (nonHrtMetrics.length === 0) {
+    return (
+      <div className="glass rounded-card px-5 py-6 text-meta text-ink-secondary">
+        No general health labs found (cholesterol, glucose, TSH, etc.).{" "}
+        <a href="/places" className="underline underline-offset-4 text-brand">Add them to your profile</a> or upload visit notes.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6 glass rounded-card px-5 py-4 flex items-start gap-3">
+        <Activity className="h-5 w-5 shrink-0 text-ink-secondary mt-0.5" />
+        <p className="text-meta text-ink-secondary leading-relaxed">
+          General health labs tracked independently of your hormone therapy.
+          Labs marked <span className="text-amber-600 font-semibold">May be HRT-affected</span> can be influenced by your current regimen —
+          see the note on each card for context.
+        </p>
+      </div>
+      <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+        {enriched.map(m => {
+          const impact = getSharedImpact(m.name);
+          return (
+            <div key={m.name} className="flex flex-col gap-2">
+              {impact && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50/80 border border-amber-200 text-[12px] text-amber-700">
+                  <span className="font-semibold shrink-0 mt-0.5">⚠ May be HRT-affected:</span>
+                  <span>{impact}</span>
+                </div>
+              )}
+              <MetricChart
+                metric={m}
+                highlighted={!!highlightedMetric && m.name.toLowerCase() === highlightedMetric.toLowerCase()}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -754,10 +854,10 @@ function TestableDataTab({ metrics, initialMetric }: { metrics: Metric[]; initia
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-type Tab = "live" | "testable";
+type Tab = "hrt" | "nonhrt" | "testable";
 
 export function TrajectoryClient() {
-  const [tab, setTab] = useState<Tab>("live");
+  const [tab, setTab] = useState<Tab>("hrt");
   const [profile, setProfile] = useState<Profile>(emptyProfile());
   const [analysisLabs, setAnalysisLabs] = useState<LabValue[]>([]);
   const [highlightedMetric, setHighlightedMetric] = useState<string | undefined>(undefined);
@@ -766,7 +866,9 @@ export function TrajectoryClient() {
     setProfile(loadProfile());
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "testable") setTab("testable");
+    const tabParam = params.get("tab");
+    if (tabParam === "testable") setTab("testable");
+    else if (tabParam === "nonhrt") setTab("nonhrt");
     const metricParam = params.get("metric");
     if (metricParam) setHighlightedMetric(decodeURIComponent(metricParam));
 
@@ -786,6 +888,12 @@ export function TrajectoryClient() {
   const metrics = userMetrics.length > 0 ? userMetrics : DEMO_METRICS;
   const isDemo = userMetrics.length === 0;
 
+  const TABS = [
+    { id: "hrt",      label: "HRT",          Icon: TrendingUp  },
+    { id: "nonhrt",   label: "Non-HRT",      Icon: Activity    },
+    { id: "testable", label: "Testable Data", Icon: FlaskConical },
+  ] as const;
+
   return (
     <div className="page-ocean">
       <PageHero
@@ -796,29 +904,33 @@ export function TrajectoryClient() {
       <Container className="pb-20">
         {/* Tab switcher */}
         <div className="flex gap-1 p-1 glass rounded-[14px] w-fit mb-8">
-          {([["live", "Live Data", TrendingUp], ["testable", "Testable Data", FlaskConical]] as const).map(
-            ([id, label, Icon]) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[15px] font-semibold transition-all duration-200",
-                  tab === id
-                    ? "bg-white/90 text-sea-ink shadow-sm"
-                    : "text-ink-secondary hover:text-ink-primary"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            )
-          )}
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-[10px] text-[15px] font-semibold transition-all duration-200",
+                tab === id
+                  ? "bg-white/90 text-sea-ink shadow-sm"
+                  : "text-ink-secondary hover:text-ink-primary"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
 
-        {tab === "live" && (
-          <LiveDataTab
+        {tab === "hrt" && (
+          <HrtTab
             metrics={metrics}
             isDemo={isDemo}
+            highlightedMetric={highlightedMetric}
+          />
+        )}
+        {tab === "nonhrt" && (
+          <NonHrtTab
+            metrics={metrics}
             highlightedMetric={highlightedMetric}
           />
         )}

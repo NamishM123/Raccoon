@@ -38,10 +38,13 @@ interface TermDef {
   explanation: string;
 }
 
+type Category = "hrt_related" | "unrelated" | "may_interact";
+
 interface TimelineItem {
   heading: string;
   plain: string;
   terms: TermDef[];
+  category?: Category;
 }
 
 interface Comparison {
@@ -50,6 +53,7 @@ interface Comparison {
   headline: string;
   detail: string;
   terms: TermDef[];
+  category?: Category;
 }
 
 interface AnalysisResult {
@@ -483,6 +487,28 @@ function AnalysisResults({ result }: { result: AnalysisResult }) {
   );
 }
 
+// ── Category badge ────────────────────────────────────────────────────────────
+
+const CATEGORY_META: Record<
+  "hrt_related" | "unrelated" | "may_interact",
+  { label: string; cls: string; dot: string }
+> = {
+  hrt_related:  { label: "HRT related",  cls: "bg-brand/10 text-brand border-brand/20",                dot: "bg-brand" },
+  unrelated:    { label: "Unrelated",    cls: "bg-surface-inset text-ink-secondary border-divider",     dot: "bg-ink-secondary/40" },
+  may_interact: { label: "May interact", cls: "bg-amber-50 text-amber-700 border-amber-200",            dot: "bg-amber-500" },
+};
+
+function CategoryBadge({ category }: { category?: "hrt_related" | "unrelated" | "may_interact" }) {
+  if (!category) return null;
+  const m = CATEGORY_META[category];
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border", m.cls)}>
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", m.dot)} />
+      {m.label}
+    </span>
+  );
+}
+
 // ── Timeline grid + drawer ────────────────────────────────────────────────────
 
 function TimelineGrid({ items }: { items: TimelineItem[] }) {
@@ -624,6 +650,11 @@ function TimelineCard({
             {isActive ? "Show less" : "Show more…"}
           </button>
         </div>
+        {item.category && (
+          <div className="mt-2">
+            <CategoryBadge category={item.category} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -715,14 +746,17 @@ function ComparisonCard({ comparison }: { comparison: Comparison }) {
         <Icon className={cn("h-5 w-5 mt-0.5 shrink-0", meta.color)} />
 
         <div className="flex-1 min-w-0">
-          <span
-            className={cn(
-              "text-meta px-2 py-0.5 rounded-chip font-bold uppercase tracking-[0.08em]",
-              meta.badge
-            )}
-          >
-            {meta.label}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={cn(
+                "text-meta px-2 py-0.5 rounded-chip font-bold uppercase tracking-[0.08em]",
+                meta.badge
+              )}
+            >
+              {meta.label}
+            </span>
+            <CategoryBadge category={comparison.category} />
+          </div>
 
           <p className="mt-2 text-body text-ink-primary font-medium leading-snug">
             {comparison.headline}
