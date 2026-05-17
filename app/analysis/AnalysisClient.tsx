@@ -641,6 +641,35 @@ function ComparisonList({ comparisons }: { comparisons: Comparison[] }) {
   );
 }
 
+// ── Metric keyword detection ──────────────────────────────────────────────────
+
+const METRIC_KEYWORDS: { keywords: string[]; name: string }[] = [
+  { keywords: ["estradiol", "estrogen", "e2"], name: "Estradiol" },
+  { keywords: ["testosterone"], name: "Testosterone" },
+  { keywords: ["vitamin d", "vit d", "25-oh"], name: "Vitamin D" },
+  { keywords: ["prolactin"], name: "Prolactin" },
+  { keywords: ["potassium"], name: "Potassium" },
+  { keywords: ["sodium"], name: "Sodium" },
+  { keywords: ["glucose", "blood sugar"], name: "Glucose" },
+  { keywords: ["creatinine"], name: "Creatinine" },
+  { keywords: [" ast "], name: "AST" },
+  { keywords: [" alt "], name: "ALT" },
+  { keywords: ["cholesterol"], name: "Cholesterol" },
+  { keywords: [" hdl "], name: "HDL" },
+  { keywords: [" ldl "], name: "LDL" },
+  { keywords: ["tsh", "thyroid"], name: "TSH" },
+  { keywords: ["hemoglobin", " hgb "], name: "Hemoglobin" },
+  { keywords: ["hematocrit", " hct "], name: "Hematocrit" },
+];
+
+function guessMetric(text: string): string | null {
+  const lower = ` ${text.toLowerCase()} `;
+  for (const entry of METRIC_KEYWORDS) {
+    if (entry.keywords.some((k) => lower.includes(k))) return entry.name;
+  }
+  return null;
+}
+
 // ── Comparison card ───────────────────────────────────────────────────────────
 
 const ALIGNMENT_META = {
@@ -711,13 +740,22 @@ function ComparisonCard({ comparison }: { comparison: Comparison }) {
             />
           </p>
 
-          <a
-            href={`/trajectory?tab=testable&rec=${encodeURIComponent(comparison.detail)}`}
-            className="mt-3 inline-flex items-center gap-1.5 text-meta font-medium text-brand hover:text-brand/70 transition-colors"
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            View how this could affect you
-          </a>
+          {comparison.alignment !== "neutral" && (() => {
+            const metric = guessMetric(
+              `${comparison.headline} ${comparison.detail} ${comparison.recommendation}`
+            );
+            const params = new URLSearchParams({ tab: "testable", rec: comparison.detail });
+            if (metric) params.set("metric", metric);
+            return (
+              <a
+                href={`/trajectory?${params}`}
+                className="mt-3 inline-flex items-center gap-1.5 text-meta font-medium text-brand hover:text-brand/70 transition-colors"
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                View how this could affect you
+              </a>
+            );
+          })()}
         </div>
       </div>
     </div>
