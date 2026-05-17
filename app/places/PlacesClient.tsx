@@ -23,6 +23,11 @@ import {
   type Profile,
   type Surgery,
 } from "@/lib/profile";
+import {
+  findInteractions,
+  SEVERITY_LABEL,
+  type InteractionSeverity,
+} from "@/lib/hrt_interactions";
 
 export function PlacesClient() {
   const [profile, setProfile] = useState<Profile>(emptyProfile());
@@ -195,6 +200,8 @@ export function PlacesClient() {
             </Section>
 
             <DrugSafety medications={profile.medications} />
+
+            <InteractionChecker medications={profile.medications} />
 
             <Section
               title="Surgical history"
@@ -813,6 +820,69 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InteractionChecker({ medications }: { medications: Medication[] }) {
+  const hits = useMemo(() => findInteractions(medications), [medications]);
+  if (hits.length === 0) return null;
+
+  const severityClass: Record<InteractionSeverity, string> = {
+    warning: "border-status-banned/40 bg-status-banned/5",
+    caution: "border-status-restricted/40 bg-status-restricted/5",
+    watch: "border-divider bg-surface-inset/40",
+  };
+  const severityTextClass: Record<InteractionSeverity, string> = {
+    warning: "text-status-banned",
+    caution: "text-status-restricted",
+    watch: "text-ink-secondary",
+  };
+
+  return (
+    <div className="glass rounded-card p-7">
+      <div className="flex items-center gap-2">
+        <Activity className="h-5 w-5 text-accent" />
+        <h2 className="text-subsection">HRT-relevant interactions</h2>
+      </div>
+      <p className="mt-1 text-meta text-ink-secondary leading-relaxed">
+        A curated short list of combinations that come up enough on HRT to
+        flag. Not a full interaction database — talk to your pharmacist for
+        the complete picture.
+      </p>
+      <div className="mt-5 space-y-3">
+        {hits.map(({ rule, matched }) => (
+          <div
+            key={rule.id}
+            className={cn(
+              "rounded-card border p-4",
+              severityClass[rule.severity]
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle
+                className={cn("h-4 w-4 shrink-0", severityTextClass[rule.severity])}
+              />
+              <span className={cn("text-meta uppercase tracking-[0.12em] font-bold", severityTextClass[rule.severity])}>
+                {SEVERITY_LABEL[rule.severity]}
+              </span>
+            </div>
+            <div className="mt-1 text-body text-ink-primary font-bold leading-snug">
+              {rule.title}
+            </div>
+            <p className="mt-2 text-meta text-ink-primary leading-relaxed">
+              {rule.explanation}
+            </p>
+            <p className="mt-2 text-meta text-ink-primary leading-relaxed">
+              <span className="font-bold">What to do: </span>
+              {rule.what_to_do}
+            </p>
+            <div className="mt-2 text-meta text-ink-secondary">
+              Matched: {matched.join(" · ")}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
