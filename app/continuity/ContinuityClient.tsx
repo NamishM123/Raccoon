@@ -16,6 +16,9 @@ import {
   X,
   BookOpen,
   ExternalLink,
+  Stethoscope,
+  ClipboardList,
+  MessageSquareQuote,
 } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
@@ -46,10 +49,18 @@ interface ParsedItem {
   note: string;
 }
 
+interface NextSteps {
+  summary: string;
+  differential: string[];
+  missing_workup: string[];
+  ask_for_next_visit: string[];
+}
+
 interface ParsedReport {
   report_date: string;
   summary: string;
   items: ParsedItem[];
+  next_steps?: NextSteps;
 }
 
 const COMMON_LABS = [
@@ -81,7 +92,7 @@ export function ContinuityClient() {
       <PageHero
         eyebrow="Lab check"
         title="A weird number isn't always a problem."
-        description="Upload your full blood report, or type a single value. Either way you get a plain-language read against your hormones. Not medical advice — just translation."
+        description="Upload your full blood report and get a plain-language read against your hormones — plus the workup that should happen next, so you walk into the appointment with the differential already separated."
       />
 
       <Container className="pb-16">
@@ -361,6 +372,8 @@ function ReportResults({
         </p>
       </div>
 
+      <NextStepsCard next={report.next_steps} />
+
       {report.items.length === 0 ? (
         <div className="rounded-card bg-surface-inset px-5 py-4 text-meta text-ink-secondary">
           No lab values could be read from this file. Try a clearer photo or
@@ -372,6 +385,97 @@ function ReportResults({
             <ResultLine key={i} item={it} regimen={regimen} />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function NextStepsCard({ next }: { next?: NextSteps }) {
+  if (!next) return null;
+  const hasLists =
+    next.differential.length > 0 ||
+    next.missing_workup.length > 0 ||
+    next.ask_for_next_visit.length > 0;
+  if (!next.summary && !hasLists) return null;
+
+  return (
+    <div className="rounded-card border border-accent/30 bg-accent/5 px-5 py-5">
+      <div className="flex items-center gap-2">
+        <Stethoscope className="h-4 w-4 text-accent" />
+        <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
+          What to push for next visit
+        </div>
+      </div>
+      {next.summary && (
+        <p className="mt-2 text-body text-ink-primary leading-relaxed font-medium">
+          {next.summary}
+        </p>
+      )}
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <NextStepsColumn
+          icon={Stethoscope}
+          label="Differential to consider"
+          hint="Most likely explanations a clinician should weigh."
+          items={next.differential}
+        />
+        <NextStepsColumn
+          icon={ClipboardList}
+          label="What wasn't ordered"
+          hint="Standard follow-up labs/imaging missing from this report."
+          items={next.missing_workup}
+        />
+        <NextStepsColumn
+          icon={MessageSquareQuote}
+          label="Read these in the room"
+          hint="One-sentence asks for the next appointment."
+          items={next.ask_for_next_visit}
+        />
+      </div>
+
+      {hasLists && (
+        <p className="mt-4 text-meta text-ink-secondary leading-relaxed">
+          Questions to raise — not a diagnosis. Take this read to a clinician
+          you trust before changing anything.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function NextStepsColumn({
+  icon: Icon,
+  label,
+  hint,
+  items,
+}: {
+  icon: typeof Stethoscope;
+  label: string;
+  hint: string;
+  items: string[];
+}) {
+  return (
+    <div className="rounded-btn border border-divider bg-surface px-4 py-3">
+      <div className="flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5 text-ink-primary" />
+        <div className="text-meta uppercase tracking-[0.1em] text-ink-primary font-bold">
+          {label}
+        </div>
+      </div>
+      <p className="mt-1 text-meta text-ink-secondary leading-snug">{hint}</p>
+      {items.length === 0 ? (
+        <p className="mt-3 text-meta text-ink-secondary italic">
+          Nothing flagged on this report.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {items.map((it, i) => (
+            <li key={i} className="flex gap-2 text-meta text-ink-primary leading-snug">
+              <span className="text-ink-secondary shrink-0">·</span>
+              <span>{it}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
