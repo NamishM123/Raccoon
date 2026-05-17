@@ -593,7 +593,7 @@ function MedRow({
         </button>
       </div>
       {open && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 mt-1 z-20 glass-strong rounded-btn border border-divider shadow-cardHover overflow-hidden">
+        <div className="absolute left-0 right-0 mt-1 z-20 bg-white rounded-btn border border-divider shadow-cardHover overflow-hidden">
           <div className="px-3 py-1.5 text-meta uppercase tracking-[0.12em] text-ink-secondary border-b divider-soft">
             RxNorm Matches
           </div>
