@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ExternalLink, FileText, Loader2, X, AlertTriangle } from "lucide-react";
+import { ChevronDown, ExternalLink, FileText, Loader2, X, AlertTriangle, MessageCircle, ShieldCheck, ArrowUp } from "lucide-react";
 import { StatusPill } from "@/components/Pill";
 import { Button } from "@/components/Button";
 import { PROCEDURE_KEYS, PROCEDURE_LABELS } from "@/data/care_status";
@@ -11,7 +11,23 @@ import {
   INSURANCE_LABELS,
   type InsuranceKey,
 } from "@/data/insurance_coverage";
+import {
+  VERIFIED_SOURCES_BY_PROCEDURE,
+  REDDIT_QUERY_BY_PROCEDURE,
+} from "@/data/verified_sources";
 import type { ProcedureKey, StateCareData } from "@/types";
+
+interface RedditReview {
+  id: string;
+  title: string;
+  snippet: string;
+  author: string;
+  subreddit: string;
+  url: string;
+  score: number;
+  num_comments: number;
+  created_utc: number;
+}
 
 export function StateDrawer({
   state,
@@ -320,7 +336,195 @@ function ProcedureRow({
               </ul>
             </div>
           )}
+
+          <RedditReviews procedure={procedure} />
+          <VerifiedSources procedure={procedure} />
         </div>
+      )}
+    </div>
+  );
+}
+
+function timeAgo(unixSeconds: number): string {
+  if (!unixSeconds) return "";
+  const diffSec = Math.max(1, Math.floor(Date.now() / 1000 - unixSeconds));
+  const units: Array<[number, string]> = [
+    [60, "s"],
+    [60, "m"],
+    [24, "h"],
+    [30, "d"],
+    [12, "mo"],
+    [Number.POSITIVE_INFINITY, "y"],
+  ];
+  let value = diffSec;
+  let label = "s";
+  for (const [step, l] of units) {
+    if (value < step) {
+      label = l;
+      break;
+    }
+    value = Math.floor(value / step);
+    label = l;
+  }
+  return `${value}${label} ago`;
+}
+
+function RedditReviews({ procedure }: { procedure: ProcedureKey }) {
+  const [open, setOpen] = useState(false);
+  const [posts, setPosts] = useState<RedditReview[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || loaded || busy) return;
+    setBusy(true);
+    setError(null);
+    const q = REDDIT_QUERY_BY_PROCEDURE[procedure];
+    fetch(`/api/reddit?q=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setPosts(Array.isArray(d?.posts) ? d.posts : []);
+        setLoaded(true);
+      })
+      .catch(() => setError("Couldn't reach Reddit."))
+      .finally(() => setBusy(false));
+  }, [open, loaded, busy, procedure]);
+
+  return (
+    <div className="rounded-btn border border-divider/60 bg-surface/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-3 py-2.5 flex items-center justify-between gap-2"
+      >
+        <div className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-[#FF4500]" />
+          <span className="text-ink-primary font-medium">
+            How it felt — patient reviews from Reddit
+          </span>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-secondary" />}
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-ink-secondary transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-2">
+          {error && (
+            <p className="text-meta text-status-banned">{error}</p>
+          )}
+          {loaded && !error && posts.length === 0 && (
+            <p className="text-meta text-ink-secondary">
+              No matching experience posts found right now.
+            </p>
+          )}
+          {posts.map((p) => (
+            <a
+              key={p.id}
+              href={p.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-btn border border-divider bg-white/70 hover:bg-white px-3 py-2 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-[11px] text-ink-secondary">
+                <span className="font-bold text-[#FF4500]">r/{p.subreddit}</span>
+                <span>·</span>
+                <span>u/{p.author}</span>
+                {p.created_utc > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{timeAgo(p.created_utc)}</span>
+                  </>
+                )}
+              </div>
+              <p className="mt-1 text-body text-ink-primary leading-snug">
+                {p.title}
+              </p>
+              {p.snippet && (
+                <p className="mt-1 text-meta text-ink-secondary leading-snug line-clamp-3">
+                  {p.snippet}
+                </p>
+              )}
+              <div className="mt-1.5 flex items-center gap-3 text-[11px] text-ink-secondary">
+                <span className="inline-flex items-center gap-0.5">
+                  <ArrowUp className="h-3 w-3" />
+                  {p.score}
+                </span>
+                <span className="inline-flex items-center gap-0.5">
+                  <MessageCircle className="h-3 w-3" />
+                  {p.num_comments}
+                </span>
+              </div>
+            </a>
+          ))}
+          {loaded && posts.length > 0 && (
+            <p className="text-[11px] text-ink-secondary">
+              Source: Reddit public search. Anecdotes — not medical advice.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerifiedSources({ procedure }: { procedure: ProcedureKey }) {
+  const [open, setOpen] = useState(false);
+  const sources = VERIFIED_SOURCES_BY_PROCEDURE[procedure] ?? [];
+  if (sources.length === 0) return null;
+
+  return (
+    <div className="rounded-btn border border-divider/60 bg-surface/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-3 py-2.5 flex items-center justify-between gap-2"
+      >
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-status-protected" />
+          <span className="text-ink-primary font-medium">
+            Verified sources
+          </span>
+          <span className="text-[11px] font-semibold text-ink-secondary bg-surface-inset px-2 py-0.5 rounded-full">
+            {sources.length}
+          </span>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-ink-secondary transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <ul className="px-3 pb-3 pt-1 space-y-2">
+          {sources.map((s) => (
+            <li
+              key={s.url}
+              className="rounded-btn border border-divider bg-white/70 px-3 py-2"
+            >
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-body text-ink-primary font-medium underline-offset-4 hover:underline"
+              >
+                {s.title}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              <div className="text-[11px] uppercase tracking-[0.1em] text-ink-secondary mt-0.5">
+                {s.publisher}
+              </div>
+              {s.note && (
+                <p className="mt-1 text-meta text-ink-secondary leading-snug">
+                  {s.note}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
