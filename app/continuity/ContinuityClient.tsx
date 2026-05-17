@@ -107,30 +107,7 @@ export function ContinuityClient() {
           </div>
 
           <aside className="lg:sticky lg:top-24 lg:self-start flex flex-col gap-6">
-            <div className="glass rounded-card p-7">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-ink-primary" />
-                <h2 className="text-subsection">The missing book</h2>
-              </div>
-              <p className="mt-3 text-meta text-ink-secondary leading-relaxed">
-                Medical textbooks have ranges for "men" and "women" — not
-                "person on estradiol for 4 years." Doctors are guessing at
-                your normal because nobody collected the data.
-              </p>
-              <p className="mt-3 text-meta text-ink-secondary leading-relaxed">
-                Every person who opts in on their profile drops one anonymous
-                puzzle piece into the box. The interpretations here get
-                sharper as that pile grows. The book that should exist —
-                you're helping build it.
-              </p>
-              <div className="mt-5">
-                <Link href="/places">
-                  <Button variant="secondary" size="sm">
-                    Open my profile
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <MissingBookCard />
 
             <div className="glass rounded-card p-7">
               <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary mb-3">
@@ -415,7 +392,7 @@ function ResultLine({ item, regimen }: { item: ParsedItem; regimen: string }) {
   return (
     <div className="rounded-card border border-divider bg-surface px-5 py-4">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-body text-ink-primary font-bold">{item.name}</span>
             <span className="text-meta text-ink-secondary tabular-nums">
@@ -440,6 +417,11 @@ function ResultLine({ item, regimen }: { item: ParsedItem; regimen: string }) {
               {item.note}
             </p>
           )}
+          <CohortBar
+            labName={item.name}
+            value={item.value}
+            regimen={regimen}
+          />
           {flagged && (
             <button
               onClick={() => setOpen((v) => !v)}
@@ -457,6 +439,175 @@ function ResultLine({ item, regimen }: { item: ParsedItem; regimen: string }) {
             {shortVerdict(verdict)}
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface PercentilePayload {
+  lab: string;
+  regimen_label: string;
+  unit: string;
+  mean: number;
+  sd: number;
+  n: number;
+  percentile: number;
+  z: number;
+  position_norm: number;
+  user_value: number;
+}
+
+function CohortBar({
+  labName,
+  value,
+  regimen,
+}: {
+  labName: string;
+  value: string | number;
+  regimen: string;
+}) {
+  const [data, setData] = useState<PercentilePayload | null>(null);
+  const fetchedFor = useRef<string>("");
+
+  useEffect(() => {
+    const num = typeof value === "string" ? parseFloat(value.replace(/[^0-9.\-]/g, "")) : value;
+    if (!labName || !Number.isFinite(num)) return;
+    const key = `${labName}|${num}|${regimen}`;
+    if (fetchedFor.current === key) return;
+    fetchedFor.current = key;
+    fetch("/api/cohort/percentile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lab_name: labName, value: num, regimen }),
+    })
+      .then((r) => r.json())
+      .then((d) => setData(d?.result || null))
+      .catch(() => setData(null));
+  }, [labName, value, regimen]);
+
+  if (!data) return null;
+  return <PercentileVis data={data} />;
+}
+
+function MissingBookCard() {
+  const [stats, setStats] = useState<{ total_observations: number; unique_regimens: number } | null>(null);
+  useEffect(() => {
+    fetch("/api/cohort/percentile")
+      .then((r) => r.json())
+      .then((d) => setStats(d))
+      .catch(() => setStats(null));
+  }, []);
+  return (
+    <div className="glass rounded-card p-7">
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-ink-primary" />
+        <h2 className="text-subsection">The missing book</h2>
+      </div>
+      {stats && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-btn border border-divider bg-surface px-3 py-2">
+            <div className="text-card text-ink-primary tabular-nums">
+              {stats.total_observations.toLocaleString()}
+            </div>
+            <div className="text-meta text-ink-secondary">observations seeded</div>
+          </div>
+          <div className="rounded-btn border border-divider bg-surface px-3 py-2">
+            <div className="text-card text-ink-primary tabular-nums">
+              {stats.unique_regimens}
+            </div>
+            <div className="text-meta text-ink-secondary">distinct regimens</div>
+          </div>
+        </div>
+      )}
+      <p className="mt-4 text-meta text-ink-secondary leading-relaxed">
+        Medical textbooks have ranges for "men" and "women" — not "person on
+        estradiol for 4 years." When you check a lab here, we look up where
+        your value falls in the distribution of people on your regimen.
+      </p>
+      <p className="mt-3 text-meta text-ink-secondary leading-relaxed">
+        The seed numbers are calibrated to published trans-HRT cohort studies
+        (ENIGI, Defreyne, Velho). Real opt-in user data merges in over time —
+        the book grows as the community fills it.
+      </p>
+      <div className="mt-5">
+        <Link href="/places">
+          <Button variant="secondary" size="sm">
+            Open my profile
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PercentileVis({ data }: { data: PercentilePayload }) {
+  // Sample 60 points across mean ± 3σ to draw a smooth bell.
+  const w = 320;
+  const h = 56;
+  const margin = 4;
+  const points: Array<{ x: number; y: number }> = [];
+  const N = 60;
+  let maxPdf = 0;
+  for (let i = 0; i <= N; i++) {
+    const z = -3 + (i / N) * 6;
+    const pdf = Math.exp(-0.5 * z * z);
+    points.push({ x: i / N, y: pdf });
+    if (pdf > maxPdf) maxPdf = pdf;
+  }
+  const path = points
+    .map((p, i) => {
+      const x = margin + p.x * (w - 2 * margin);
+      const y = h - margin - (p.y / maxPdf) * (h - 2 * margin);
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const baseline = `M ${margin} ${h - margin} L ${w - margin} ${h - margin}`;
+  const userX = margin + data.position_norm * (w - 2 * margin);
+  const tone =
+    data.percentile <= 5 || data.percentile >= 95
+      ? "#EF4444"
+      : data.percentile <= 15 || data.percentile >= 85
+      ? "#F59E0B"
+      : "#16a34a";
+  return (
+    <div className="mt-3 rounded-btn border border-divider bg-surface-inset/40 px-3 py-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
+          Cohort · {data.regimen_label} · n={data.n.toLocaleString()}
+        </div>
+        <div className="text-meta text-ink-primary">
+          <span className="font-bold tabular-nums">{data.percentile}th</span>{" "}
+          percentile
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="mt-2 w-full h-auto" role="img">
+        <defs>
+          <linearGradient id="bell" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(59,130,246,0.25)" />
+            <stop offset="100%" stopColor="rgba(59,130,246,0)" />
+          </linearGradient>
+        </defs>
+        <path d={`${path} L ${w - margin} ${h - margin} L ${margin} ${h - margin} Z`} fill="url(#bell)" />
+        <path d={path} fill="none" stroke="#3B82F6" strokeWidth={1.5} />
+        <path d={baseline} stroke="rgba(15,42,61,0.2)" strokeWidth={1} />
+        {/* Mean tick */}
+        <line
+          x1={w / 2}
+          x2={w / 2}
+          y1={margin}
+          y2={h - margin}
+          stroke="rgba(15,42,61,0.25)"
+          strokeWidth={1}
+          strokeDasharray="2 3"
+        />
+        {/* User dot */}
+        <line x1={userX} x2={userX} y1={margin} y2={h - margin} stroke={tone} strokeWidth={1.5} />
+        <circle cx={userX} cy={h / 2} r={5} fill={tone} stroke="#fff" strokeWidth={1.5} />
+      </svg>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-ink-secondary tabular-nums">
+        <span>{(data.mean - 3 * data.sd).toFixed(1)}</span>
+        <span>μ {data.mean}</span>
+        <span>{(data.mean + 3 * data.sd).toFixed(1)} {data.unit}</span>
       </div>
     </div>
   );
@@ -723,6 +874,7 @@ function SingleValueCheck({ profile }: { profile: Profile }) {
         <SingleResult
           result={result}
           labName={labName}
+          labValue={value}
           regimen={profile.hormone_regimen_summary || ""}
         />
       )}
@@ -733,10 +885,12 @@ function SingleValueCheck({ profile }: { profile: Profile }) {
 function SingleResult({
   result,
   labName,
+  labValue,
   regimen,
 }: {
   result: LabInterpretation;
   labName: string;
+  labValue: string;
   regimen: string;
 }) {
   const meta =
@@ -767,6 +921,7 @@ function SingleResult({
           <p className="mt-1 text-meta text-ink-primary">{result.ask_doctor_about}</p>
         </div>
       )}
+      <CohortBar labName={labName} value={labValue} regimen={regimen} />
       <Citations labName={labName} regimen={regimen} />
     </div>
   );

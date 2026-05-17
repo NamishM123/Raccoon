@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User } from "lucide-react";
+import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User, Activity } from "lucide-react";
 import { Container } from "@/components/Container";
 import { GlassButton, GlassFilter } from "@/components/ui/liquid-glass";
 import { WaveBackground } from "@/components/WaveBackground";
@@ -69,6 +69,12 @@ function ToolCards() {
       desc: "Meds, surgeries, last labs. Stored in your browser. Type it once, use it everywhere.",
     },
     {
+      href: "/predict",
+      icon: Activity,
+      title: "Hormone forecast",
+      desc: "Model your injection schedule's curve. Find your trough. Pick the best day to draw labs.",
+    },
+    {
       href: "/document",
       icon: FileText,
       title: "Pre-visit card",
@@ -78,7 +84,7 @@ function ToolCards() {
       href: "/continuity",
       icon: FlaskConical,
       title: "Lab check",
-      desc: "A weird number? Type it in. Find out if it's normal for someone on your hormones — or worth asking about.",
+      desc: "Type a value or upload your report. Get a verdict against your regimen and your percentile in the cohort.",
     },
     {
       href: "/map",
@@ -90,7 +96,7 @@ function ToolCards() {
   return (
     <section id="tools" className="scroll-mt-24 pb-section">
       <Container>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-stretch">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 items-stretch">
           {tools.map((t) => (
             <Link
               key={t.href}
