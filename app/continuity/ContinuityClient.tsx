@@ -484,6 +484,13 @@ interface Citation {
   url: string;
 }
 
+interface CuratedShift {
+  name: string;
+  regimen: string;
+  direction: "up" | "down" | "shifts-to-natal-opposite";
+  note: string;
+}
+
 function Citations({
   labName,
   regimen,
@@ -492,6 +499,8 @@ function Citations({
   regimen: string;
 }) {
   const [citations, setCitations] = useState<Citation[] | null>(null);
+  const [shift, setShift] = useState<CuratedShift | null>(null);
+  const [source, setSource] = useState<"live" | "curated" | "merged" | "none">("none");
   const [busy, setBusy] = useState(false);
   const fetchedFor = useRef<string>("");
 
@@ -506,8 +515,15 @@ function Citations({
       body: JSON.stringify({ lab_name: labName, regimen }),
     })
       .then((r) => r.json())
-      .then((d) => setCitations(Array.isArray(d?.citations) ? d.citations : []))
-      .catch(() => setCitations([]))
+      .then((d) => {
+        setCitations(Array.isArray(d?.citations) ? d.citations : []);
+        setShift(d?.curated_shift || null);
+        setSource((d?.source as any) || "none");
+      })
+      .catch(() => {
+        setCitations([]);
+        setShift(null);
+      })
       .finally(() => setBusy(false));
   }, [labName, regimen]);
 
@@ -515,12 +531,42 @@ function Citations({
 
   return (
     <div className="mt-5 rounded-card border border-divider bg-surface px-5 py-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <BookOpen className="h-4 w-4 text-ink-primary" />
         <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
-          Recent research
+          Evidence on {labName}
         </div>
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-[0.12em] font-bold px-2 py-0.5 rounded-chip",
+            source === "live"
+              ? "bg-status-protected/15 text-status-protected"
+              : source === "merged"
+              ? "bg-accent/15 text-accent"
+              : source === "curated"
+              ? "bg-surface text-ink-secondary border border-divider"
+              : "hidden"
+          )}
+        >
+          {source === "live"
+            ? "Live PubMed"
+            : source === "merged"
+            ? "Live + curated"
+            : source === "curated"
+            ? "Curated reference"
+            : ""}
+        </span>
       </div>
+
+      {shift && (
+        <div className="mt-3 rounded-btn border border-divider bg-surface-inset/40 px-3 py-2">
+          <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
+            Expected on {shift.regimen.replace("-", " ")}
+          </div>
+          <p className="mt-1 text-meta text-ink-primary leading-relaxed">{shift.note}</p>
+        </div>
+      )}
+
       {busy && !citations ? (
         <div className="mt-3 text-meta text-ink-secondary inline-flex items-center gap-2">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching PubMed…
@@ -554,9 +600,21 @@ function Citations({
             </li>
           ))}
         </ul>
+      ) : !shift ? (
+        <div className="mt-3 text-meta text-ink-secondary">
+          No matching studies on PubMed and no curated reference for this lab.
+        </div>
       ) : (
         <div className="mt-3 text-meta text-ink-secondary">
-          No matching studies on PubMed for this lab in the trans-HRT literature.
+          PubMed returned no recent studies — falling back to the curated guideline above.{" "}
+          <a
+            href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(labName + " transgender hormone")}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-ink-primary hover:underline underline-offset-4 inline-flex items-center gap-1"
+          >
+            Search PubMed directly <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { buildLabEvidenceQuery, searchPubmed } from "@/lib/external/pubmed";
+import { findLabShift } from "@/lib/external/curated";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,20 +13,34 @@ export async function POST(req: Request) {
   }
   const lab = (body.lab_name || "").trim();
   const regimen = (body.regimen || "").trim();
-  if (!lab) return json({ citations: [] });
+  if (!lab) return json({ citations: [], curated_shift: null, source: "none" });
+
+  const curated_shift = findLabShift(lab, regimen);
+
+  let citations: Awaited<ReturnType<typeof searchPubmed>> = [];
+  let query = "";
   try {
-    const query = buildLabEvidenceQuery(lab, regimen);
-    let citations = await searchPubmed(query, 3);
+    query = buildLabEvidenceQuery(lab, regimen);
+    citations = await searchPubmed(query, 3);
     if (citations.length === 0) {
-      // Fall back to a broader query — sometimes the strict trans/HRT filter
-      // returns nothing for less-studied labs. Drop the HRT clause.
-      const fallback = `"${lab}"[tiab] AND (transgender[tiab] OR \"gender-affirming\"[tiab])`;
+      const fallback = `"${lab}"[tiab] AND (transgender[tiab] OR "gender-affirming"[tiab])`;
+      query = fallback;
       citations = await searchPubmed(fallback, 3);
     }
-    return json({ citations, query });
-  } catch (e: any) {
-    return json({ citations: [], error: e?.message });
+  } catch {
+    /* live unavailable */
   }
+
+  const source =
+    citations.length && curated_shift
+      ? "merged"
+      : citations.length
+      ? "live"
+      : curated_shift
+      ? "curated"
+      : "none";
+
+  return json({ citations, curated_shift, query, source });
 }
 
 function json(body: unknown, status = 200) {

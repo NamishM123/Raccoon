@@ -549,6 +549,14 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
       product_description: string;
     }>;
     adverse: { total_reports: number; top_reactions: Array<{ term: string; count: number }> } | null;
+    curated: {
+      rxcui: string;
+      generic: string;
+      brand_names: string[];
+      monitoring_note: string;
+      watches: string[];
+    } | null;
+    source: "live" | "curated" | "merged" | "none";
   }>>([]);
   const [busy, setBusy] = useState(false);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
@@ -580,6 +588,7 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
   if (drugs.length === 0) return null;
 
   const recallCount = items.reduce((acc, it) => acc + it.recalls.length, 0);
+  const liveHits = items.filter((i) => i.source === "live" || i.source === "merged").length;
 
   return (
     <div className="glass rounded-card p-7">
@@ -590,7 +599,7 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
             <h2 className="text-subsection">Drug safety check</h2>
           </div>
           <p className="mt-1 text-meta text-ink-secondary">
-            Live lookup against the FDA's drug recall & adverse-event databases.
+            FDA recalls + adverse-event reports, layered with trans-HRT monitoring notes.
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={run} disabled={busy}>
@@ -621,26 +630,73 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
                 {recallCount} recall{recallCount === 1 ? "" : "s"} found
               </span>
             )}
+            {" · "}
+            <span className="text-ink-secondary">
+              {liveHits ? `${liveHits} live FDA hit${liveHits === 1 ? "" : "s"}` : "Curated reference"}
+            </span>
           </div>
           {items.map((it) => (
             <div key={it.drug} className="rounded-card border border-divider bg-surface-inset/30 p-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {it.recalls.length === 0 ? (
                   <CheckCircle2 className="h-4 w-4 text-status-protected" />
                 ) : (
                   <AlertTriangle className="h-4 w-4 text-status-restricted" />
                 )}
                 <span className="text-body text-ink-primary font-bold capitalize">
-                  {it.drug}
+                  {it.curated?.generic || it.drug}
                 </span>
+                {it.curated?.rxcui && (
+                  <a
+                    href={`https://mor.nlm.nih.gov/RxNav/search?searchBy=RXCUI&searchTerm=${it.curated.rxcui}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-meta text-ink-secondary hover:underline underline-offset-4 inline-flex items-center gap-1"
+                  >
+                    RxCUI {it.curated.rxcui} <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+                <SourceBadge source={it.source} />
                 {it.adverse && (
                   <span className="ml-auto text-meta text-ink-secondary">
                     {it.adverse.total_reports.toLocaleString()} adverse-event reports on file
                   </span>
                 )}
               </div>
+
+              {it.curated && (
+                <>
+                  <div className="mt-3 rounded-btn border border-divider bg-surface px-3 py-2">
+                    <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
+                      Trans-HRT monitoring note
+                    </div>
+                    <p className="mt-1 text-meta text-ink-primary leading-relaxed">
+                      {it.curated.monitoring_note}
+                    </p>
+                  </div>
+                  {it.curated.watches.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-meta text-ink-secondary">Watch:</span>
+                      {it.curated.watches.map((w) => (
+                        <span
+                          key={w}
+                          className="text-meta px-2 py-0.5 rounded-chip bg-accent/10 text-accent font-medium"
+                        >
+                          {w}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {it.curated.brand_names.length > 0 && (
+                    <div className="mt-2 text-meta text-ink-secondary">
+                      Also sold as: {it.curated.brand_names.join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
+
               {it.recalls.length === 0 ? (
-                <div className="mt-2 text-meta text-ink-secondary">
+                <div className="mt-3 text-meta text-ink-secondary">
                   No recent FDA recalls for this drug.
                 </div>
               ) : (
@@ -689,7 +745,7 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
             </div>
           ))}
           <div className="text-meta text-ink-secondary">
-            Source: openFDA.{" "}
+            Sources: openFDA enforcement & adverse-event API, NLM RxNorm, trans-HRT clinical guidelines.{" "}
             <a
               href="https://open.fda.gov/apis/drug/"
               target="_blank"
@@ -900,5 +956,26 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
     <div className="rounded-card bg-surface-inset px-5 py-4 text-meta text-ink-secondary">
       {children}
     </div>
+  );
+}
+
+function SourceBadge({ source }: { source: "live" | "curated" | "merged" | "none" }) {
+  if (source === "none") return null;
+  const label =
+    source === "live"
+      ? "Live FDA"
+      : source === "merged"
+      ? "Live + curated"
+      : "Curated reference";
+  const tone =
+    source === "live"
+      ? "bg-status-protected/15 text-status-protected"
+      : source === "merged"
+      ? "bg-accent/15 text-accent"
+      : "bg-surface text-ink-secondary border border-divider";
+  return (
+    <span className={cn("text-[10px] uppercase tracking-[0.12em] font-bold px-2 py-0.5 rounded-chip", tone)}>
+      {label}
+    </span>
   );
 }
