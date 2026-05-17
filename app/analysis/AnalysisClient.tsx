@@ -94,6 +94,8 @@ export function AnalysisClient() {
 
 // ── Upload + analysis orchestrator ────────────────────────────────────────────
 
+const ANALYSIS_STORAGE_KEY = "seagull_analysis_v1";
+
 function UploadAndAnalyze({ profile }: { profile: Profile }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -102,9 +104,17 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ANALYSIS_STORAGE_KEY);
+      if (raw) setResult(JSON.parse(raw));
+    } catch {}
+  }, []);
+
   function pickFile(f: File | null) {
     setError(null);
     setResult(null);
+    if (f === null) localStorage.removeItem(ANALYSIS_STORAGE_KEY);
     setFile(f);
   }
 
@@ -123,6 +133,7 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
         setError(data?.error || "Couldn't analyze that document.");
       } else {
         setResult(data as AnalysisResult);
+        try { localStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(data)); } catch {}
       }
     } catch (e: any) {
       setError(e?.message || "Network error.");
@@ -197,7 +208,10 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="text-meta text-ink-secondary">
-            Sent once for analysis, then discarded. Nothing is stored.
+            {result
+              ? <button onClick={() => { setResult(null); setFile(null); localStorage.removeItem(ANALYSIS_STORAGE_KEY); }} className="underline underline-offset-4 hover:text-ink-primary transition-colors">Clear saved results</button>
+              : "Sent once for analysis, then discarded. Nothing is stored."
+            }
           </span>
           <Button onClick={analyze} disabled={!file || busy}>
             {busy ? (
