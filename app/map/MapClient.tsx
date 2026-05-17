@@ -233,7 +233,7 @@ export function MapClient() {
       <div className="glass rounded-card p-6 mb-8">
         <div className="flex flex-col gap-4">
           <p className="text-meta text-ink-secondary leading-relaxed">
-            Type your procedure and insurance — matching states stay lit on the
+            Type your procedure and insurance. Matching states stay lit on the
             map, and we list them below.
           </p>
           <div className="grid gap-4 md:grid-cols-2">

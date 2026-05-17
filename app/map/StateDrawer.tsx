@@ -438,7 +438,7 @@ function RedditReviews({ procedure }: { procedure: ProcedureKey }) {
         <div className="flex items-center gap-2">
           <MessageCircle className="h-4 w-4 text-[#FF4500]" />
           <span className="text-ink-primary font-medium">
-            How it felt — patient reviews from Reddit
+            How it felt: patient reviews from Reddit
           </span>
           {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-secondary" />}
         </div>
@@ -515,14 +515,14 @@ function RedditReviews({ procedure }: { procedure: ProcedureKey }) {
               ))}
               <p className="text-[11px] text-ink-secondary">
                 Reddit didn&apos;t return live posts (rate limited or blocked).
-                These are representative community-style experiences — anecdotal, not medical advice.
+                These are representative community-style experiences: anecdotal, not medical advice.
               </p>
             </>
           )}
 
           {!usedFallback && loaded && posts.length > 0 && (
             <p className="text-[11px] text-ink-secondary">
-              Source: Reddit public search. Anecdotes — not medical advice.
+              Source: Reddit public search. Anecdotes, not medical advice.
             </p>
           )}
         </div>
