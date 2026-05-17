@@ -33,6 +33,7 @@ const QUICK_REASONS = [
 ];
 
 type Mode = "full" | "wallet";
+type Audience = "patient" | "clinician";
 
 interface Brief {
   elevator_pitch: string;
@@ -52,6 +53,7 @@ export function DocumentClient() {
   const [extraContext, setExtraContext] = useState("");
   const [goals, setGoals] = useState<string[]>(["", "", ""]);
   const [mode, setMode] = useState<Mode>("full");
+  const [audience, setAudience] = useState<Audience>("clinician");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -327,33 +329,63 @@ export function DocumentClient() {
             {/* Right: previews */}
             <div className="flex flex-col gap-6">
               {/* Preview toggle */}
-              <div className="flex items-center justify-between gap-3 print:hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
                 <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary">
                   Preview
                 </div>
-                <div className="inline-flex rounded-btn border border-divider bg-surface p-1 text-meta">
-                  <button
-                    onClick={() => setMode("full")}
-                    className={
-                      "px-3 py-1 rounded-btn transition-colors " +
-                      (mode === "full"
-                        ? "bg-accent/15 text-ink-primary font-bold"
-                        : "text-ink-secondary")
-                    }
-                  >
-                    Full Card
-                  </button>
-                  <button
-                    onClick={() => setMode("wallet")}
-                    className={
-                      "px-3 py-1 rounded-btn transition-colors " +
-                      (mode === "wallet"
-                        ? "bg-accent/15 text-ink-primary font-bold"
-                        : "text-ink-secondary")
-                    }
-                  >
-                    Wallet Pass
-                  </button>
+                <div className="flex flex-wrap gap-2">
+                  {mode === "full" && (
+                    <div className="inline-flex rounded-btn border border-divider bg-surface p-1 text-meta">
+                      <button
+                        onClick={() => setAudience("patient")}
+                        title="Includes AI-generated pitch, A/P shorthand, and questions to expect — for your own prep."
+                        className={
+                          "px-3 py-1 rounded-btn transition-colors " +
+                          (audience === "patient"
+                            ? "bg-accent/15 text-ink-primary font-bold"
+                            : "text-ink-secondary")
+                        }
+                      >
+                        Patient view
+                      </button>
+                      <button
+                        onClick={() => setAudience("clinician")}
+                        title="Strips the AI flourish. This is what you hand over."
+                        className={
+                          "px-3 py-1 rounded-btn transition-colors " +
+                          (audience === "clinician"
+                            ? "bg-accent/15 text-ink-primary font-bold"
+                            : "text-ink-secondary")
+                        }
+                      >
+                        Clinician view
+                      </button>
+                    </div>
+                  )}
+                  <div className="inline-flex rounded-btn border border-divider bg-surface p-1 text-meta">
+                    <button
+                      onClick={() => setMode("full")}
+                      className={
+                        "px-3 py-1 rounded-btn transition-colors " +
+                        (mode === "full"
+                          ? "bg-accent/15 text-ink-primary font-bold"
+                          : "text-ink-secondary")
+                      }
+                    >
+                      Full Card
+                    </button>
+                    <button
+                      onClick={() => setMode("wallet")}
+                      className={
+                        "px-3 py-1 rounded-btn transition-colors " +
+                        (mode === "wallet"
+                          ? "bg-accent/15 text-ink-primary font-bold"
+                          : "text-ink-secondary")
+                      }
+                    >
+                      Wallet Pass
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -365,6 +397,7 @@ export function DocumentClient() {
                     extraContext={extraContext}
                     goals={goals}
                     brief={briefIsStale ? null : brief}
+                    audience={audience}
                   />
                   <div className="glass rounded-card p-5 flex items-center justify-between gap-4 print:hidden">
                     <div className="text-meta text-ink-secondary">
@@ -409,13 +442,14 @@ export function DocumentClient() {
         @media print {
           @page {
             size: letter;
-            margin: 0.4in;
+            margin: 0.5in;
           }
           html,
           body {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
+            color: #0a0a0a !important;
           }
           .page-ocean::before,
           .page-ocean::after {
@@ -427,18 +461,66 @@ export function DocumentClient() {
           .printable-card,
           .printable-card * {
             visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .printable-card {
-            position: fixed !important;
+            position: absolute !important;
             top: 0 !important;
             left: 0 !important;
             right: 0 !important;
-            bottom: auto !important;
             margin: 0 !important;
-            width: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
             background: white !important;
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+            font-size: 10.5pt;
+            line-height: 1.35;
+            color: #0a0a0a;
+          }
+          /* Keep each section together; only break between them when needed. */
+          .printable-card > * {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .printable-card h1,
+          .printable-card h2,
+          .printable-card h3 {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
+          .printable-card ul,
+          .printable-card ol {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          /* Pull headings tight to their content. */
+          .printable-card .mt-4 {
+            margin-top: 0.5rem !important;
+          }
+          .printable-card .mt-3 {
+            margin-top: 0.4rem !important;
+          }
+          .printable-card .p-8 {
+            padding: 0 !important;
+          }
+          .printable-card .p-5 {
+            padding: 0.5rem 0.6rem !important;
+          }
+          .printable-card .p-4 {
+            padding: 0.45rem 0.55rem !important;
+          }
+          .printable-card .p-3 {
+            padding: 0.35rem 0.5rem !important;
+          }
+          /* Anti-clobber: links and dates shouldn't be loud in print. */
+          .printable-card a {
+            color: inherit !important;
+            text-decoration: none !important;
           }
         }
       `}</style>
@@ -454,8 +536,13 @@ const PrintableCard = forwardRef<
     extraContext: string;
     goals: string[];
     brief: Brief | null;
+    audience: Audience;
   }
->(function PrintableCard({ profile, reason, extraContext, goals, brief }, ref) {
+>(function PrintableCard(
+  { profile, reason, extraContext, goals, brief, audience },
+  ref
+) {
+  const showAIExtras = audience === "patient";
   const name = profile.display_name.trim();
   const pronouns = profile.pronouns.trim();
   const age = profile.age.trim();
@@ -552,16 +639,17 @@ const PrintableCard = forwardRef<
         </div>
       )}
 
-      {/* Clinician preamble */}
+      {/* Clinician preamble — short neutral line in clinician view, fuller LLM
+          framing in patient view */}
       <div className="mt-4 text-meta text-ink-secondary leading-relaxed">
         <span className="text-ink-primary font-bold">For the clinician:</span>{" "}
-        {brief?.framing_note ? (
+        {showAIExtras && brief?.framing_note ? (
           brief.framing_note
         ) : (
           <>
-            Box 1 is today&apos;s chief complaint. Box 2 is hormone context,
-            included so it doesn&apos;t get mistaken for the cause. Please
-            assess them separately.
+            Box 1 is today&apos;s chief complaint. Box 2 is hormone context —
+            included so it isn&apos;t mistaken for the cause. Please assess
+            them separately.
           </>
         )}
       </div>
@@ -572,7 +660,7 @@ const PrintableCard = forwardRef<
           Box 1 · Today I Am Here Because
         </div>
 
-        {brief?.elevator_pitch && (
+        {showAIExtras && brief?.elevator_pitch && (
           <p className="mt-2 text-body text-ink-primary italic leading-relaxed">
             &ldquo;{brief.elevator_pitch}&rdquo;
           </p>
@@ -582,7 +670,7 @@ const PrintableCard = forwardRef<
           {reason || "…"}
         </p>
 
-        {brief?.clinician_shorthand && (
+        {showAIExtras && brief?.clinician_shorthand && (
           <div className="mt-3 rounded-btn bg-accent/5 border border-accent/40 px-3 py-2 font-mono text-meta text-ink-primary">
             <span className="text-accent font-bold not-italic">A/P · </span>
             {brief.clinician_shorthand}
@@ -602,7 +690,7 @@ const PrintableCard = forwardRef<
           </div>
         )}
 
-        {brief && brief.questions_to_expect.length > 0 && (
+        {showAIExtras && brief && brief.questions_to_expect.length > 0 && (
           <div className="mt-4">
             <div className="text-meta uppercase tracking-[0.1em] text-ink-secondary font-bold">
               Questions the clinician may ask
