@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User, Activity } from "lucide-react";
+import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User, Activity, Stethoscope, LineChart } from "lucide-react";
 import { Container } from "@/components/Container";
 import { GlassButton, GlassFilter } from "@/components/ui/liquid-glass";
 import { WaveBackground } from "@/components/WaveBackground";
@@ -66,7 +66,19 @@ function ToolCards() {
       href: "/places",
       icon: User,
       title: "Your profile",
-      desc: "Meds, surgeries, last labs. Stored in your browser. Type it once, use it everywhere.",
+      desc: "Meds, surgeries, labs. Stored in your browser. Type it once, use it everywhere.",
+    },
+    {
+      href: "/notes",
+      icon: Stethoscope,
+      title: "Doctor's Read",
+      desc: "Upload an after-visit summary. We translate the jargon and flag what the doctor missed.",
+    },
+    {
+      href: "/trends",
+      icon: LineChart,
+      title: "Trajectory Alerts",
+      desc: "Every lab plotted over time, with a projection to clinical thresholds. Catch slow drift early.",
     },
     {
       href: "/predict",
@@ -75,16 +87,16 @@ function ToolCards() {
       desc: "Model your injection schedule's curve. Find your trough. Pick the best day to draw labs.",
     },
     {
+      href: "/continuity",
+      icon: FlaskConical,
+      title: "Lab Check",
+      desc: "Type a value or upload your report. Get a verdict against your regimen + cohort percentile.",
+    },
+    {
       href: "/document",
       icon: FileText,
       title: "Pre-visit card",
       desc: "Hand it to the doctor. Two boxes: why you're here, and what is not why you're here.",
-    },
-    {
-      href: "/continuity",
-      icon: FlaskConical,
-      title: "Lab check",
-      desc: "Type a value or upload your report. Get a verdict against your regimen and your percentile in the cohort.",
     },
     {
       href: "/map",

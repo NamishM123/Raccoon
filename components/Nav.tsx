@@ -8,9 +8,11 @@ import { cn } from "@/lib/cn";
 
 const TOOL_LINKS = [
   { href: "/places", label: "Profile" },
+  { href: "/notes", label: "Doctor's Read" },
+  { href: "/trends", label: "Trajectory" },
   { href: "/predict", label: "Predict" },
-  { href: "/document", label: "Visit Card" },
   { href: "/continuity", label: "Lab Check" },
+  { href: "/document", label: "Visit Card" },
   { href: "/map", label: "Care Map" },
 ];
 
