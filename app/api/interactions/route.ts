@@ -1,55 +1,42 @@
-// Drug interaction checker via NLM RxNav.
-// 1. Extract first token (drug name) from each free-text medication description
-// 2. Resolve each name to an RxCUI via RxNorm
-// 3. Pass all RxCUIs to the RxNav interaction list endpoint
-// 4. Return structured interactions with severity
+// Drug interaction checker via the Claude API.
+//
+// The previous version of this route used NLM RxNav's interaction list,
+// which has been incomplete since the National Library of Medicine
+// retired the Drug Interaction API in early 2024 — many real
+// interactions were not being reported. We now ask Claude to evaluate
+// the medication list directly and return a structured assessment.
+//
+// IMPORTANT: this is decision support, not medical advice. Both the UI
+// and the response carry a disclaimer.
+
+import { anthropic, MODEL } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RXNORM_BASE = "https://rxnav.nlm.nih.gov/REST";
+const SYSTEM_PROMPT = `You are a clinical pharmacology assistant evaluating a list of medications for drug-drug interactions. Be conservative — surface interactions that have meaningful clinical consequences, including ones specific to gender-affirming hormone therapy (estradiol, testosterone, spironolactone, finasteride, bicalutamide, GnRH agonists, progesterone, etc.).
 
-async function resolveRxCUI(name: string): Promise<string | null> {
-  try {
-    const url = `${RXNORM_BASE}/rxcui.json?name=${encodeURIComponent(name)}&search=1`;
-    const res = await fetch(url, { next: { revalidate: 86400 } });
-    const data = await res.json();
-    return data?.idGroup?.rxnormId?.[0] ?? null;
-  } catch {
-    return null;
-  }
-}
+Input: a JSON object with a "medications" array of free-text medication descriptions. The first word is usually the drug name; dose, route, and frequency may follow.
 
-async function fetchInteractions(rxcuis: string[]) {
-  if (rxcuis.length < 2) return [];
-  try {
-    const url = `${RXNORM_BASE}/interaction/list.json?rxcuis=${rxcuis.join("+")}`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
-    const data = await res.json();
-    const groups: any[] = data?.fullInteractionTypeGroup ?? [];
-    const out: Array<{
-      drug1: string; drug2: string;
-      severity: string; description: string;
-      sourceUrl: string;
-    }> = [];
-    for (const g of groups) {
-      for (const type of g?.fullInteractionType ?? []) {
-        for (const pair of type?.interactionPair ?? []) {
-          const concepts = pair?.interactionConcept ?? [];
-          const drug1 = concepts[0]?.minConceptItem?.name ?? "";
-          const drug2 = concepts[1]?.minConceptItem?.name ?? "";
-          const severity = pair?.severity ?? "unknown";
-          const description = pair?.description ?? "";
-          const sourceUrl = g?.sourceDisclaimer ?? "";
-          if (drug1 && drug2) out.push({ drug1, drug2, severity, description, sourceUrl });
-        }
-      }
+Return VALID JSON ONLY with this exact shape:
+{
+  "interactions": [
+    {
+      "drug1": "Drug A (generic name, lowercase)",
+      "drug2": "Drug B (generic name, lowercase)",
+      "severity": "major" | "moderate" | "minor",
+      "description": "One or two sentences explaining the mechanism and what could happen clinically.",
+      "advice": "One short sentence on what the patient should do (e.g. 'separate doses by 4 hours', 'monitor potassium', 'avoid combining - ask prescriber for an alternative')."
     }
-    return out;
-  } catch {
-    return [];
-  }
+  ]
 }
+
+Rules:
+- Only include pairs with a real, documented interaction. Do not invent interactions to fill the list.
+- If the same drug appears twice, ignore the duplicate.
+- If there are no clinically meaningful interactions, return { "interactions": [] }.
+- "severity" must be exactly one of "major", "moderate", or "minor". Use "major" for combinations that can cause serious harm (QT prolongation, serotonin syndrome, dangerous hyperkalemia, bleeding risk, etc.). Use "moderate" for ones requiring dose adjustment or monitoring. Use "minor" for low-impact pharmacokinetic interactions.
+- Output JSON only, no prose, no markdown fences.`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -58,22 +45,111 @@ function json(body: unknown, status = 200) {
   });
 }
 
+interface RawInteraction {
+  drug1?: unknown;
+  drug2?: unknown;
+  severity?: unknown;
+  description?: unknown;
+  advice?: unknown;
+}
+
+function normalize(raw: RawInteraction[]): Array<{
+  drug1: string;
+  drug2: string;
+  severity: string;
+  description: string;
+  sourceUrl: string;
+}> {
+  const out: Array<{
+    drug1: string;
+    drug2: string;
+    severity: string;
+    description: string;
+    sourceUrl: string;
+  }> = [];
+  for (const r of raw) {
+    const drug1 = String(r?.drug1 ?? "").trim();
+    const drug2 = String(r?.drug2 ?? "").trim();
+    if (!drug1 || !drug2) continue;
+    const sev = String(r?.severity ?? "moderate").trim().toLowerCase();
+    const severity =
+      sev === "major" || sev === "moderate" || sev === "minor" ? sev : "moderate";
+    const description = String(r?.description ?? "").trim();
+    const advice = String(r?.advice ?? "").trim();
+    const fullDescription = advice ? `${description} ${advice}` : description;
+    out.push({
+      drug1,
+      drug2,
+      severity,
+      description: fullDescription,
+      sourceUrl: "",
+    });
+  }
+  return out;
+}
+
+function extractJson(text: string): RawInteraction[] | null {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    const obj = JSON.parse(text.slice(start, end + 1));
+    if (Array.isArray(obj?.interactions)) return obj.interactions as RawInteraction[];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   let body: { meds?: string[] };
-  try { body = await req.json(); } catch { return json({ error: "invalid JSON" }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid JSON" }, 400);
+  }
 
-  const meds = Array.isArray(body.meds) ? body.meds : [];
+  const meds = Array.isArray(body.meds)
+    ? body.meds
+        .map((m) => String(m || "").trim())
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
   if (meds.length < 2) return json({ interactions: [] });
 
-  // Extract first word from each free-text description as the drug name
-  const names = meds
-    .map(m => m.trim().split(/[\s,·]+/)[0])
-    .filter(Boolean)
-    .slice(0, 10);
+  try {
+    const res = await anthropic().messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({ medications: meds }),
+        },
+      ],
+    });
 
-  const rxcuiResults = await Promise.all(names.map(resolveRxCUI));
-  const rxcuis = rxcuiResults.filter((id): id is string => id !== null);
+    const out = res.content
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join("")
+      .trim();
 
-  const interactions = await fetchInteractions(rxcuis);
-  return json({ interactions });
+    const raw = extractJson(out);
+    if (!raw) {
+      return json({ interactions: [], source: "Claude" });
+    }
+
+    return json({
+      interactions: normalize(raw),
+      source: "Claude",
+      disclaimer:
+        "AI-generated interaction check. Decision support only - confirm with a pharmacist or prescriber before acting.",
+    });
+  } catch (e: any) {
+    return json(
+      { error: e?.message || "Server error", interactions: [] },
+      500,
+    );
+  }
 }

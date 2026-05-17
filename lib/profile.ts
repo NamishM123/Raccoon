@@ -27,6 +27,23 @@ export interface Allergy {
   reaction: string;
 }
 
+// Body parts the user is asked to mark as absent. Order matters — it
+// is rendered as-is in the UI grid.
+export const TRACKABLE_BODY_PARTS = [
+  "Breasts / chest tissue",
+  "Uterus",
+  "Ovaries",
+  "Fallopian tubes",
+  "Cervix",
+  "Vagina",
+  "Penis",
+  "Testes",
+  "Prostate",
+  "Adam's apple (laryngeal prominence)",
+] as const;
+
+export type BodyPart = typeof TRACKABLE_BODY_PARTS[number];
+
 export interface Profile {
   display_name: string;
   pronouns: string;
@@ -34,7 +51,12 @@ export interface Profile {
   sex_assigned_at_birth: "male" | "female" | "intersex" | "";
   hormone_regimen_summary: string;
   allergies: Allergy[];
+  // Free-text notes the user types about anatomy not covered by the
+  // structured `missing_anatomy` list.
   anatomical_inventory: string;
+  // Body parts the user has marked as absent (surgically removed, or
+  // never present). Anything not in this list is assumed present.
+  missing_anatomy: string[];
   medications: Medication[];
   surgeries: Surgery[];
   recent_labs: LabValue[];
@@ -52,6 +74,7 @@ export function emptyProfile(): Profile {
     hormone_regimen_summary: "",
     allergies: [],
     anatomical_inventory: "",
+    missing_anatomy: [],
     medications: [],
     surgeries: [],
     recent_labs: [],
@@ -86,6 +109,8 @@ export function newId(): string {
 function migrate(p: any): Profile {
   if (!Array.isArray(p.allergies)) p.allergies = [];
   if (typeof p.anatomical_inventory !== "string") p.anatomical_inventory = "";
+  if (!Array.isArray(p.missing_anatomy)) p.missing_anatomy = [];
+  else p.missing_anatomy = p.missing_anatomy.filter((x: unknown) => typeof x === "string");
   if (Array.isArray(p.medications)) {
     p.medications = p.medications.map((m: any) => {
       if (typeof m?.description === "string") return { id: m.id || newId(), description: m.description };
@@ -125,7 +150,10 @@ export function profileForPrompt(p: Profile): string {
   const lines: string[] = [];
   if (p.age) lines.push(`- Age: ${p.age}`);
   if (p.sex_assigned_at_birth) lines.push(`- Sex assigned at birth: ${p.sex_assigned_at_birth}`);
-  if (p.anatomical_inventory) lines.push(`- Anatomical inventory: ${p.anatomical_inventory}`);
+  if (p.missing_anatomy?.length) {
+    lines.push(`- Body parts absent: ${p.missing_anatomy.join(", ")}`);
+  }
+  if (p.anatomical_inventory) lines.push(`- Anatomical notes: ${p.anatomical_inventory}`);
   if (p.allergies?.length) {
     lines.push("- Allergies:");
     for (const a of p.allergies) {

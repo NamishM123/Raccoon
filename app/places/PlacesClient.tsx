@@ -14,6 +14,7 @@ import {
   loadProfile,
   newId,
   saveProfile,
+  TRACKABLE_BODY_PARTS,
   type Allergy,
   type LabValue,
   type Medication,
@@ -187,17 +188,27 @@ export function PlacesClient() {
 
             <Section
               title="Anatomical Inventory"
-              subtitle="What's actually in your body now. Cuts through gendered EHR defaults so the right screenings get ordered."
+              subtitle="Tick the body parts you do NOT have. Anything you don't tick is assumed present. Cuts through gendered EHR defaults so the right screenings get ordered."
               icon={<span className="text-[1.75rem] leading-none" aria-hidden>🫀</span>}
             >
-              <textarea
-                value={profile.anatomical_inventory}
-                onChange={(e) => update("anatomical_inventory", e.target.value)}
-                onBlur={flashSaved}
-                rows={2}
-                placeholder="e.g. Cervix, ovaries, prostate present. Uterus removed 2023."
-                className="w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
+              <BodyPartGrid
+                missing={profile.missing_anatomy}
+                onChange={(next) => {
+                  update("missing_anatomy", next);
+                  flashSaved();
+                }}
               />
+              <div className="mt-4">
+                <FieldLabel>Notes (optional)</FieldLabel>
+                <textarea
+                  value={profile.anatomical_inventory}
+                  onChange={(e) => update("anatomical_inventory", e.target.value)}
+                  onBlur={flashSaved}
+                  rows={2}
+                  placeholder="Anything not in the list above — e.g. partial removals, dates, complications."
+                  className="mt-2 w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </div>
             </Section>
 
             <Section
@@ -1073,6 +1084,56 @@ function TextField({
   );
 }
 
+function BodyPartGrid({
+  missing,
+  onChange,
+}: {
+  missing: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const set = new Set(missing);
+  function toggle(part: string) {
+    const next = new Set(set);
+    if (next.has(part)) next.delete(part);
+    else next.add(part);
+    onChange(Array.from(next));
+  }
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {TRACKABLE_BODY_PARTS.map((part) => {
+        const absent = set.has(part);
+        return (
+          <button
+            key={part}
+            type="button"
+            onClick={() => toggle(part)}
+            className={cn(
+              "flex items-center gap-2 rounded-btn border px-3 py-2 text-left text-body transition-colors",
+              absent
+                ? "border-status-banned/40 bg-status-banned/10 text-ink-primary"
+                : "border-divider bg-surface text-ink-secondary hover:bg-surface-inset"
+            )}
+            aria-pressed={absent}
+          >
+            <span
+              className={cn(
+                "h-4 w-4 shrink-0 rounded border flex items-center justify-center text-[10px] font-bold",
+                absent
+                  ? "border-status-banned bg-status-banned text-white"
+                  : "border-divider bg-white text-transparent"
+              )}
+              aria-hidden
+            >
+              ✕
+            </span>
+            <span className="leading-tight">{part}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function EmptyHint({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-card bg-surface-inset px-5 py-4 text-meta text-ink-secondary">
@@ -1081,7 +1142,7 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Drug Interactions (NLM RxNav) ─────────────────────────────────────────────
+// ── Drug Interactions (Claude API) ────────────────────────────────────────────
 
 interface Interaction {
   drug1: string; drug2: string;
@@ -1089,13 +1150,13 @@ interface Interaction {
 }
 
 const SEVERITY_META: Record<string, { label: string; color: string; bg: string }> = {
-  "N/A":          { label: "Minor",           color: "text-sky-600",    bg: "bg-sky-50 border-sky-200" },
-  "high":         { label: "Serious",         color: "text-red-600",    bg: "bg-red-50 border-red-200" },
-  "N/A (Drug-Drug Interaction)": { label: "Interaction", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+  major:    { label: "Major",    color: "text-red-700",    bg: "bg-red-50 border-red-200" },
+  moderate: { label: "Moderate", color: "text-amber-700",  bg: "bg-amber-50 border-amber-200" },
+  minor:    { label: "Minor",    color: "text-sky-700",    bg: "bg-sky-50 border-sky-200" },
 };
 
 function severityMeta(s: string) {
-  return SEVERITY_META[s] ?? { label: s || "Interaction", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" };
+  return SEVERITY_META[s?.toLowerCase()] ?? { label: s || "Interaction", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" };
 }
 
 function DrugInteractions({ medications }: { medications: Medication[] }) {
@@ -1142,7 +1203,7 @@ function DrugInteractions({ medications }: { medications: Medication[] }) {
             <h2 className="text-subsection">Drug Interaction Check</h2>
           </div>
           <p className="mt-1 text-meta text-ink-secondary">
-            Live check via NLM RxNav for known interactions between your medications.
+            AI-assisted check (Claude) for clinically meaningful interactions between your medications, including hormone-therapy-specific pairings.
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={run} disabled={busy}>
@@ -1161,6 +1222,9 @@ function DrugInteractions({ medications }: { medications: Medication[] }) {
               ? <span className="text-status-protected font-medium">No known interactions found between your medications.</span>
               : <span className="font-medium">{interactions.length} interaction{interactions.length > 1 ? "s" : ""} found.</span>
             }
+          </p>
+          <p className="text-[11px] text-ink-secondary leading-relaxed">
+            AI-generated by Claude. Decision support only — confirm any flagged combination with a pharmacist or prescriber before changing anything.
           </p>
 
           {interactions.map((ix, i) => {
