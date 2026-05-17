@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Printer, AlertCircle } from "lucide-react";
 import { Container } from "@/components/Container";
@@ -120,9 +121,9 @@ export function DocumentClient() {
               </div>
             </div>
 
-            {/* Right: printable card */}
-            <div className="lg:sticky lg:top-24 lg:self-start">
-              <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary mb-3 print:hidden">
+            {/* Right: on-screen preview only */}
+            <div className="lg:sticky lg:top-24 lg:self-start print:hidden">
+              <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary mb-3">
                 Preview
               </div>
               <PrintableCard
@@ -135,26 +136,70 @@ export function DocumentClient() {
         )}
       </Container>
 
+      {/* Print portal: a clean copy of the card rendered straight under <body>,
+          hidden on screen, so the print engine has nothing else to paginate. */}
+      <PrintPortal>
+        <div className="print-only-card">
+          <PrintableCard
+            profile={profile}
+            reason={reason}
+            extraContext={extraContext}
+          />
+        </div>
+      </PrintPortal>
+
       <style jsx global>{`
+        .print-only-card {
+          display: none;
+        }
         @media print {
-          body * {
-            visibility: hidden !important;
+          @page {
+            size: letter;
+            margin: 0.5in;
           }
-          .printable-card,
-          .printable-card * {
-            visibility: visible !important;
+          html,
+          body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
-          .printable-card {
-            position: absolute !important;
-            left: 0;
-            top: 0;
-            width: 100%;
+          /* Hide every direct child of body except the print portal. */
+          body > *:not(.print-portal) {
+            display: none !important;
+          }
+          .print-portal {
+            display: block !important;
+            position: static !important;
+          }
+          .print-only-card {
+            display: block !important;
+          }
+          .print-only-card .printable-card {
             box-shadow: none !important;
+            border: 1px solid #cbd5e1 !important;
+            background: white !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
         }
       `}</style>
     </div>
   );
+}
+
+function PrintPortal({ children }: { children: React.ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.className = "print-portal";
+    document.body.appendChild(el);
+    setHost(el);
+    return () => {
+      document.body.removeChild(el);
+    };
+  }, []);
+  if (!host) return null;
+  return createPortal(children, host);
 }
 
 const PrintableCard = forwardRef<
