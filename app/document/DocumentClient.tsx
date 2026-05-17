@@ -2,7 +2,7 @@
 
 import { Fragment, forwardRef, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Printer, ClipboardList, Download, Sparkles, Loader2, RefreshCw, ChevronDown } from "lucide-react";
+import { Printer, ClipboardList, Download, ChevronDown } from "lucide-react";
 import { toPng } from "html-to-image";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
@@ -33,15 +33,6 @@ const QUICK_REASONS = [
 ];
 
 type Mode = "full" | "wallet";
-type Audience = "patient" | "clinician";
-
-interface Brief {
-  elevator_pitch: string;
-  clinician_shorthand: string;
-  questions_to_expect: string[];
-  questions_patient_should_ask: string[];
-  framing_note: string;
-}
 
 interface ComplaintHistory {
   onset: string;
@@ -79,22 +70,8 @@ export function DocumentClient() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [goals, setGoals] = useState<string[]>(["", "", ""]);
   const [mode, setMode] = useState<Mode>("full");
-  const [audience, setAudience] = useState<Audience>("clinician");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
-
-  const [brief, setBrief] = useState<Brief | null>(null);
-  const [briefBusy, setBriefBusy] = useState(false);
-  const [briefError, setBriefError] = useState<string | null>(null);
-  const [briefKey, setBriefKey] = useState<string>(""); // input hash brief was generated for
-  const currentKey = JSON.stringify({
-    p: profile,
-    r: reason.trim(),
-    g: goals.map((g) => g.trim()).filter(Boolean),
-    x: extraContext.trim(),
-    h: history,
-  });
-  const briefIsStale = brief !== null && briefKey !== currentKey;
 
   const walletRef = useRef<HTMLDivElement>(null);
 
@@ -114,36 +91,6 @@ export function DocumentClient() {
 
   function print() {
     window.print();
-  }
-
-  async function generateBrief() {
-    if (briefBusy || !reason.trim()) return;
-    setBriefBusy(true);
-    setBriefError(null);
-    const keyAtRequest = currentKey;
-    try {
-      const res = await fetch("/api/document/brief", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          profile,
-          reason,
-          goals,
-          extraContext,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || data?.error) {
-        setBriefError(data?.error || "Couldn't generate the briefing.");
-      } else {
-        setBrief(data);
-        setBriefKey(keyAtRequest);
-      }
-    } catch (e: any) {
-      setBriefError(e?.message || "Network error.");
-    } finally {
-      setBriefBusy(false);
-    }
   }
 
   async function saveWalletPng() {
@@ -335,77 +282,6 @@ export function DocumentClient() {
                 </div>
               </div>
 
-              <div className="glass rounded-card p-7 border border-accent/40">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-accent" />
-                      <h2 className="text-subsection">Clinician Briefing</h2>
-                    </div>
-                    <p className="mt-1 text-meta text-ink-secondary">
-                      Claude turns your inputs into a one sentence clinician
-                      summary, an elevator pitch you can read at check in, and
-                      the questions to expect.
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={generateBrief}
-                    disabled={briefBusy || !reason.trim()}
-                    className="shrink-0 btn-glow-blue"
-                  >
-                    {briefBusy ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                        Generating…
-                      </>
-                    ) : brief ? (
-                      <>
-                        <RefreshCw className="h-4 w-4" />{" "}
-                        {briefIsStale ? "Regenerate" : "Refresh"}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" /> Generate
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {briefError && (
-                  <div className="mt-3 text-meta text-status-banned">
-                    {briefError}
-                  </div>
-                )}
-
-                {brief && (
-                  <div className="mt-4 space-y-4">
-                    {briefIsStale && (
-                      <div className="rounded-btn bg-status-restricted/10 border border-status-restricted/40 text-meta text-ink-primary px-3 py-2">
-                        Your inputs changed, regenerate to refresh the brief.
-                      </div>
-                    )}
-                    {brief.questions_patient_should_ask.length > 0 && (
-                      <div>
-                        <div className="text-meta uppercase tracking-[0.12em] text-ink-secondary font-bold">
-                          Questions you should ask the doctor
-                        </div>
-                        <ul className="mt-2 list-disc pl-5 space-y-1 text-meta text-ink-primary">
-                          {brief.questions_patient_should_ask.map((q, i) => (
-                            <li key={i}>{q}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <div className="text-[11px] text-ink-secondary leading-snug">
-                      The clinician facing parts of this briefing are also
-                      rendered on the card itself. Review them before handing
-                      it over.
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="glass rounded-card p-7">
                 <h2 className="text-subsection">Anything Else? (optional)</h2>
                 <p className="mt-1 text-meta text-ink-secondary">
@@ -430,34 +306,6 @@ export function DocumentClient() {
                   Preview
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {mode === "full" && (
-                    <div className="inline-flex rounded-btn border border-divider bg-surface p-1 text-meta">
-                      <button
-                        onClick={() => setAudience("patient")}
-                        title="Includes AI-generated pitch, A/P shorthand, and questions to expect — for your own prep."
-                        className={
-                          "px-3 py-1 rounded-btn transition-colors " +
-                          (audience === "patient"
-                            ? "bg-accent/15 text-ink-primary font-bold"
-                            : "text-ink-secondary")
-                        }
-                      >
-                        Patient view
-                      </button>
-                      <button
-                        onClick={() => setAudience("clinician")}
-                        title="Strips the AI flourish. This is what you hand over."
-                        className={
-                          "px-3 py-1 rounded-btn transition-colors " +
-                          (audience === "clinician"
-                            ? "bg-accent/15 text-ink-primary font-bold"
-                            : "text-ink-secondary")
-                        }
-                      >
-                        Clinician view
-                      </button>
-                    </div>
-                  )}
                   <div className="inline-flex rounded-btn border border-divider bg-surface p-1 text-meta">
                     <button
                       onClick={() => setMode("full")}
@@ -493,8 +341,6 @@ export function DocumentClient() {
                     history={history}
                     extraContext={extraContext}
                     goals={goals}
-                    brief={briefIsStale ? null : brief}
-                    audience={audience}
                   />
                   <div className="glass rounded-card p-5 flex items-center justify-between gap-4 print:hidden">
                     <div className="text-meta text-ink-secondary">
@@ -673,14 +519,11 @@ const PrintableCard = forwardRef<
     history: ComplaintHistory;
     extraContext: string;
     goals: string[];
-    brief: Brief | null;
-    audience: Audience;
   }
 >(function PrintableCard(
-  { profile, reason, history, extraContext, goals, brief, audience },
+  { profile, reason, history, extraContext, goals },
   ref
 ) {
-  const showAIExtras = audience === "patient";
   const name = profile.display_name.trim();
   const legalName = profile.legal_name.trim();
   const pronouns = profile.pronouns.trim();
@@ -810,19 +653,11 @@ const PrintableCard = forwardRef<
         </div>
       )}
 
-      {/* Clinician preamble — short neutral line in clinician view, fuller LLM
-          framing in patient view */}
       <div className="mt-4 text-meta text-ink-secondary leading-relaxed">
         <span className="text-ink-primary font-bold">For the clinician:</span>{" "}
-        {showAIExtras && brief?.framing_note ? (
-          brief.framing_note
-        ) : (
-          <>
-            Box 1 is today&apos;s chief complaint. Box 2 is hormone context —
-            included so it isn&apos;t mistaken for the cause. Please assess
-            them separately.
-          </>
-        )}
+        Box 1 is today&apos;s chief complaint. Box 2 is hormone context —
+        included so it isn&apos;t mistaken for the cause. Please assess them
+        separately.
       </div>
 
       {/* Box 1 */}
@@ -830,12 +665,6 @@ const PrintableCard = forwardRef<
         <div className="text-meta uppercase tracking-[0.12em] text-accent font-bold">
           Box 1 · Today I Am Here Because
         </div>
-
-        {showAIExtras && brief?.elevator_pitch && (
-          <p className="mt-2 text-body text-ink-primary italic leading-relaxed">
-            &ldquo;{brief.elevator_pitch}&rdquo;
-          </p>
-        )}
 
         <p className="mt-2 text-body text-ink-primary whitespace-pre-wrap leading-relaxed">
           {reason || "…"}
@@ -854,13 +683,6 @@ const PrintableCard = forwardRef<
           </dl>
         )}
 
-        {showAIExtras && brief?.clinician_shorthand && (
-          <div className="mt-3 rounded-btn bg-accent/5 border border-accent/40 px-3 py-2 font-mono text-meta text-ink-primary">
-            <span className="text-accent font-bold not-italic">A/P · </span>
-            {brief.clinician_shorthand}
-          </div>
-        )}
-
         {filledGoals.length > 0 && (
           <div className="mt-4">
             <div className="text-meta uppercase tracking-[0.1em] text-ink-secondary font-bold">
@@ -874,18 +696,6 @@ const PrintableCard = forwardRef<
           </div>
         )}
 
-        {showAIExtras && brief && brief.questions_to_expect.length > 0 && (
-          <div className="mt-4">
-            <div className="text-meta uppercase tracking-[0.1em] text-ink-secondary font-bold">
-              Questions the clinician may ask
-            </div>
-            <ul className="mt-2 list-disc pl-5 space-y-0.5 text-meta text-ink-primary">
-              {brief.questions_to_expect.map((q, i) => (
-                <li key={i}>{q}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
 
       {/* Box 2 */}
