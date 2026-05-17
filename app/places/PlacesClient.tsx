@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical, Siren, Lock, HeartHandshake } from "lucide-react";
+import Link from "next/link";
+import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical, Siren, Lock, HeartHandshake, ArrowRight } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Button } from "@/components/Button";
@@ -243,6 +244,7 @@ export function PlacesClient() {
                     <SurgeryRow
                       key={s.id}
                       surgery={s}
+                      age={profile.age}
                       onChange={(patch) => updateSurgery(s.id, patch)}
                       onCommit={flashSaved}
                       onRemove={() => removeSurgery(s.id)}
@@ -300,13 +302,21 @@ export function PlacesClient() {
                   onCommit={flashSaved}
                   placeholder="she/her, they/them, …"
                 />
-                <TextField
-                  label="Age"
-                  value={profile.age}
-                  onChange={(v) => update("age", v)}
-                  onCommit={flashSaved}
-                  inputMode="numeric"
-                />
+                <div className="flex flex-col gap-3">
+                  <TextField
+                    label="Age"
+                    value={profile.age}
+                    onChange={(v) => update("age", v)}
+                    onCommit={flashSaved}
+                    inputMode="numeric"
+                  />
+                  <Button asChild className="w-full">
+                    <Link href="/document">
+                      Create My Previsit Card
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
                 <div>
                   <FieldLabel>Sex assigned at birth</FieldLabel>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -362,9 +372,13 @@ export function PlacesClient() {
                 <h2 className="text-subsection">Help The Next Person</h2>
                 <p className="mt-2 text-meta text-ink-secondary leading-relaxed">
                   Medical books have ranges for "men" and "women," not
-                  "person on estradiol for 4 years." Opt in and your numbers
-                  (no name, no face) join the reference set Lab Check uses to
-                  show people what normal actually looks like.
+                  "person on estradiol for 4 years."
+                </p>
+                <div className="my-4 border-t divider-soft" />
+                <p className="text-meta text-ink-secondary leading-relaxed">
+                  Opt in and your numbers (no name, no face) join the reference
+                  set Lab Check uses to show people what normal actually looks
+                  like.
                 </p>
                 <label className="mt-5 flex items-start gap-3 cursor-pointer">
                   <input
@@ -749,7 +763,7 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
                         key={r.term}
                         className="text-meta px-2 py-0.5 rounded-chip bg-surface text-ink-primary"
                       >
-                        {r.term.toLowerCase()}{" "}
+                        {r.term.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}{" "}
                         <span className="text-ink-secondary">({r.count})</span>
                       </span>
                     ))}
@@ -777,38 +791,85 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
 
 function SurgeryRow({
   surgery,
+  age,
   onChange,
   onCommit,
   onRemove,
 }: {
   surgery: Surgery;
+  age: string;
   onChange: (patch: Partial<Surgery>) => void;
   onCommit: () => void;
   onRemove: () => void;
 }) {
+  const currentYear = new Date().getFullYear();
+  const parsedAge = parseInt(age, 10);
+  const hasAge = Number.isFinite(parsedAge) && parsedAge > 0 && parsedAge < 130;
+  const minYear = hasAge ? currentYear - parsedAge : 1900;
+
+  const descError = useMemo(() => {
+    if (!surgery.description.trim()) return null;
+    if (/\d/.test(surgery.description)) return "Letters only.";
+    return null;
+  }, [surgery.description]);
+
+  const dateError = useMemo(() => {
+    if (!surgery.date.trim()) return null;
+    if (/[^0-9\-\/]/.test(surgery.date)) return "Numbers only.";
+    const yearMatch = surgery.date.match(/(\d{4})/);
+    if (!yearMatch) return null;
+    const year = parseInt(yearMatch[1], 10);
+    if (year > currentYear) return "Can't be in the future.";
+    if (year < minYear) return hasAge ? "Before you were born." : "Year looks too far back.";
+    return null;
+  }, [surgery.date, minYear, currentYear, hasAge]);
+
+  const hasError = Boolean(descError || dateError);
+
+  function handleDescChange(v: string) {
+    onChange({ description: v.replace(/[0-9]/g, "") });
+  }
+  function handleDateChange(v: string) {
+    onChange({ date: v.replace(/[^0-9\-\/]/g, "") });
+  }
+
   return (
-    <div className="flex items-center gap-2 rounded-btn border border-divider bg-surface px-3 py-2">
-      <input
-        value={surgery.description}
-        onChange={(e) => onChange({ description: e.target.value })}
-        onBlur={onCommit}
-        placeholder="e.g. Top surgery"
-        className="flex-[2] bg-transparent text-body focus:outline-none"
-      />
-      <input
-        value={surgery.date}
-        onChange={(e) => onChange({ date: e.target.value })}
-        onBlur={onCommit}
-        placeholder="2024-03"
-        className="flex-[1] min-w-0 bg-transparent text-body text-ink-secondary focus:outline-none border-l border-divider pl-2"
-      />
-      <button
-        onClick={onRemove}
-        className="text-ink-secondary hover:text-status-banned p-1"
-        aria-label="Remove surgery"
+    <div>
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-btn border bg-surface px-3 py-2",
+          hasError ? "border-status-banned/50" : "border-divider"
+        )}
       >
-        <Trash2 className="h-4 w-4" />
-      </button>
+        <input
+          value={surgery.description}
+          onChange={(e) => handleDescChange(e.target.value)}
+          onBlur={onCommit}
+          placeholder="e.g. Top surgery"
+          className="flex-[2] bg-transparent text-body focus:outline-none"
+        />
+        <input
+          value={surgery.date}
+          onChange={(e) => handleDateChange(e.target.value)}
+          onBlur={onCommit}
+          inputMode="numeric"
+          placeholder="2024-03"
+          className="flex-[1] min-w-0 bg-transparent text-body text-ink-secondary focus:outline-none border-l border-divider pl-2"
+        />
+        <button
+          onClick={onRemove}
+          className="text-ink-secondary hover:text-status-banned p-1"
+          aria-label="Remove surgery"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      {hasError && (
+        <div className="mt-1 px-3 text-meta text-status-banned flex flex-wrap gap-x-4 gap-y-0.5">
+          {descError && <span>{descError}</span>}
+          {dateError && <span>{dateError}</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import type { Profile } from "@/lib/profile";
+import { Logo } from "@/components/Logo";
 
 function encodePayload(profile: Profile, reason: string, goals: string[]): string {
   // Strip fields the wallet pass doesn't show — keeps the QR scannable.
@@ -68,7 +69,7 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
     return (
       <div
         ref={ref}
-        className="wallet-pass relative w-full max-w-[360px] mx-auto overflow-hidden"
+        className="wallet-pass relative w-full max-w-[440px] mx-auto overflow-hidden"
         style={{
           aspectRatio: "5 / 7",
           background:
@@ -84,50 +85,6 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
             'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
         }}
       >
-        {/* Notch (Apple Wallet–style perforation) */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "57%",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              background: "white",
-              borderRadius: 999,
-              marginLeft: -9,
-              opacity: 0.15,
-            }}
-          />
-          <div
-            style={{
-              flex: 1,
-              height: 1,
-              background:
-                "repeating-linear-gradient(90deg, rgba(255,255,255,0.35) 0 6px, transparent 6px 12px)",
-              margin: "0 8px",
-            }}
-          />
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              background: "white",
-              borderRadius: 999,
-              marginRight: -9,
-              opacity: 0.15,
-            }}
-          />
-        </div>
-
         {/* Header */}
         <div
           style={{
@@ -137,22 +94,10 @@ export const WalletPass = forwardRef<HTMLDivElement, WalletPassProps>(
             gap: 8,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/seagull.png"
-              alt=""
-              crossOrigin="anonymous"
-              style={{ height: 22, width: "auto" }}
-            />
-            <span style={{ fontSize: 11, letterSpacing: 2, opacity: 0.85, fontWeight: 700 }}>
-              SEAGULL
+          <div className="flex items-center">
+            <Logo size={72} />
+            <span className="font-display font-medium text-[28px] leading-none tracking-tight -ml-1">
+              Seagull
             </span>
           </div>
           <span style={{ fontSize: 10, letterSpacing: 1.5, opacity: 0.7 }}>

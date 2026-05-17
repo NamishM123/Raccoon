@@ -143,7 +143,7 @@ export function DocumentClient() {
       <AuroraOverlay variant="amber" />
       <PageHero
         title={<>Hand It To The Front Desk<br />The Doctor Reads It In 30 Seconds</>}
-        description="A card that thinks. Auto computed postop weeks, screening reminders from your anatomy, and an Apple Wallet style pass for your phone."
+        description="Counts your weeks postop. Flags screenings based on the anatomy you actually have. Looks like a Wallet pass on your phone."
       />
 
       <Container className="pb-16">
@@ -309,10 +309,10 @@ export function DocumentClient() {
               </div>
 
               <div className="glass rounded-card p-7">
-                <h2 className="text-subsection">Anything Else?</h2>
+                <h2 className="text-subsection">Anything Else? (optional)</h2>
                 <p className="mt-1 text-meta text-ink-secondary">
                   Recent injuries, sensitivities, anything the doctor should see
-                  at a glance. Optional.
+                  at a glance.
                 </p>
                 <textarea
                   value={extraContext}
@@ -378,7 +378,7 @@ export function DocumentClient() {
               ) : (
                 <>
                   <div className="flex items-center justify-center py-4">
-                    <div ref={walletRef}>
+                    <div ref={walletRef} className="w-full max-w-[440px]">
                       <WalletPass profile={profile} reason={reason} goals={goals} />
                     </div>
                   </div>
@@ -471,8 +471,8 @@ const PrintableCard = forwardRef<
   const screenings = screeningReminders(profile);
 
   const demographicBits = [
-    age && `age ${age}`,
-    sex && `${sex} at birth`,
+    age && `Age ${age}`,
+    sex && `${sex[0].toUpperCase()}${sex.slice(1)} at birth`,
   ].filter(Boolean);
 
   return (

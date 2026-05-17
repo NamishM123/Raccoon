@@ -176,9 +176,9 @@ function TrustSection() {
         <div className="flex flex-col items-center gap-4">
           <div className="inline-flex items-center gap-2 text-meta uppercase tracking-[0.18em] font-medium text-ink-secondary">
             Live Sources
-            <span className="relative flex h-2 w-2 self-start mt-0.5" aria-hidden>
+            <span className="relative flex h-1.5 w-1.5 self-start mt-1" aria-hidden>
               <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 animate-ping" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2">

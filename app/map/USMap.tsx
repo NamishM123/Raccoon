@@ -30,6 +30,7 @@ export function USMap({
     code: string;
     name: string;
     status: CareStatus;
+    fips: string;
     x: number;
     y: number;
   } | null>(null);
@@ -38,13 +39,20 @@ export function USMap({
     <div className="relative">
       <ComposableMap projection="geoAlbersUsa" width={980} height={560}>
         <Geographies geography={US_TOPOLOGY_URL}>
-          {({ geographies }) =>
-            geographies.map((geo) => {
+          {({ geographies }) => {
+            const ordered = hover
+              ? [
+                  ...geographies.filter((g) => g.id !== hover.fips),
+                  ...geographies.filter((g) => g.id === hover.fips),
+                ]
+              : geographies;
+            return ordered.map((geo) => {
               const fips = geo.id;
               const code = FIPS_TO_STATE[fips];
               const state = code ? CARE_STATUS_BY_CODE[code] : null;
               const status = state?.procedures[procedure].status;
               const fill = status ? STATUS_FILL[status] : "#E5E5EA";
+              const isHovered = hover?.fips === fips;
               return (
                 <Geography
                   key={geo.rsmKey}
@@ -59,6 +67,7 @@ export function USMap({
                       code: state.state_code,
                       name: state.state_name,
                       status,
+                      fips,
                       x: rect.left - (parentRect?.left || 0) + rect.width / 2,
                       y: rect.top - (parentRect?.top || 0),
                     });
@@ -68,26 +77,30 @@ export function USMap({
                   style={{
                     default: {
                       fill,
-                      stroke: "#FFFFFF",
-                      strokeWidth: 0.75,
+                      stroke: isHovered ? "#0A2540" : "#FFFFFF",
+                      strokeWidth: isHovered ? 2.25 : 0.75,
                       outline: "none",
                       cursor: state ? "pointer" : "default",
-                      transition: "fill 0.18s",
+                      transition: "fill 0.18s, stroke-width 0.12s",
                     },
                     hover: {
                       fill,
+                      stroke: "#0A2540",
+                      strokeWidth: 2.25,
                       filter: "brightness(0.92)",
                       outline: "none",
                     },
                     pressed: {
                       fill,
+                      stroke: "#0A2540",
+                      strokeWidth: 2.25,
                       outline: "none",
                     },
                   }}
                 />
               );
-            })
-          }
+            });
+          }}
         </Geographies>
       </ComposableMap>
 

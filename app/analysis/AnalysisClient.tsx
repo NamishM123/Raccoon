@@ -72,13 +72,15 @@ export function AnalysisClient() {
 
       <Container className="pb-16">
         {loaded && !hasProfile && (
-          <div className="mb-6 glass rounded-card p-6 flex items-start gap-3">
-            <AlertCircle className="h-6 w-6 shrink-0 text-status-restricted mt-0.5" />
-            <div className="text-meta text-ink-secondary leading-relaxed">
-              <span className="text-ink-primary font-bold">No profile data yet.</span>{" "}
-              The summary section will still work. For the comparison section to reference your
-              specific labs and medications, add them on the{" "}
-              <a href="/places" className="underline underline-offset-4">Profile page</a> first.
+          <div className="mb-6 glass rounded-card p-7 flex items-start gap-4">
+            <AlertCircle className="h-7 w-7 shrink-0 text-status-restricted" />
+            <div>
+              <h2 className="text-subsection">No Profile Data Yet</h2>
+              <p className="mt-2 text-meta text-ink-secondary leading-relaxed">
+                The summary section will still work. For the comparison section to reference your
+                specific labs and medications, add them on the{" "}
+                <a href="/places" className="underline underline-offset-4">Profile page</a> first.
+              </p>
             </div>
           </div>
         )}
@@ -134,7 +136,7 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
       <div className="glass rounded-card p-7">
         <h2 className="text-subsection">Upload Your Visit Notes</h2>
         <p className="mt-2 text-meta text-ink-secondary leading-relaxed">
-          Drop the after visit summary your doctor gave you, PDF, photo, or screenshot.
+          Drop the after visit summary your doctor gave you (PDF, photo, or screenshot).
           We'll read the whole thing so you don't have to decode it.
         </p>
 
