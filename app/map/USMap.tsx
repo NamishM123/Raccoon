@@ -28,10 +28,12 @@ export function USMap({
   procedure,
   insurance,
   onSelect,
+  matchingStates,
 }: {
   procedure: ProcedureKey;
   insurance: InsuranceKey;
   onSelect: (stateCode: string) => void;
+  matchingStates?: Set<string> | null;
 }) {
   const [hover, setHover] = useState<{
     code: string;
@@ -61,6 +63,9 @@ export function USMap({
                 ? getCombinedStatus(state.state_code, insurance, procedure)
                 : undefined;
               const fill = status ? STATUS_FILL[status] : "#E5E5EA";
+              const isMatching =
+                !matchingStates || (code ? matchingStates.has(code) : false);
+              const dimmed = !!matchingStates && !isMatching;
               const isHovered = hover?.fips === fips;
               return (
                 <Geography
@@ -89,14 +94,16 @@ export function USMap({
                       fill,
                       stroke: isHovered ? "#0A2540" : "#FFFFFF",
                       strokeWidth: isHovered ? 2.25 : 0.75,
+                      opacity: dimmed ? 0.25 : 1,
                       outline: "none",
                       cursor: state ? "pointer" : "default",
-                      transition: "fill 0.18s, stroke-width 0.12s",
+                      transition: "fill 0.18s, stroke-width 0.12s, opacity 0.18s",
                     },
                     hover: {
                       fill,
                       stroke: "#0A2540",
                       strokeWidth: 2.25,
+                      opacity: dimmed ? 0.45 : 1,
                       filter: "brightness(0.92)",
                       outline: "none",
                     },
@@ -104,6 +111,7 @@ export function USMap({
                       fill,
                       stroke: "#0A2540",
                       strokeWidth: 2.25,
+                      opacity: dimmed ? 0.45 : 1,
                       outline: "none",
                     },
                   }}
