@@ -202,7 +202,7 @@ export function PlacesClient() {
 
             <Section
               title="Medications"
-              subtitle="One line each. Write it like you'd tell a friend. Formatting doesn't matter."
+              subtitle="One line each. Include dose + how often if you know them (e.g. 'Estradiol 2 mg PO BID') — it saves the doctor a question."
               action={
                 <Button size="sm" variant="secondary" onClick={addMed}>
                   <Plus className="h-4 w-4" /> Add
@@ -297,27 +297,26 @@ export function PlacesClient() {
                   onCommit={flashSaved}
                 />
                 <TextField
+                  label="Legal name (if different)"
+                  value={profile.legal_name}
+                  onChange={(v) => update("legal_name", v)}
+                  onCommit={flashSaved}
+                  placeholder="So front desk can find your chart"
+                />
+                <TextField
                   label="Pronouns"
                   value={profile.pronouns}
                   onChange={(v) => update("pronouns", v)}
                   onCommit={flashSaved}
                   placeholder="she/her, they/them, …"
                 />
-                <div className="flex flex-col gap-3">
-                  <TextField
-                    label="Age"
-                    value={profile.age}
-                    onChange={(v) => update("age", v)}
-                    onCommit={flashSaved}
-                    inputMode="numeric"
-                  />
-                  <Button asChild className="w-full">
-                    <Link href="/document">
-                      Create My Previsit Card
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                <TextField
+                  label="Age"
+                  value={profile.age}
+                  onChange={(v) => update("age", v)}
+                  onCommit={flashSaved}
+                  inputMode="numeric"
+                />
                 <div>
                   <FieldLabel>Sex assigned at birth</FieldLabel>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -337,6 +336,28 @@ export function PlacesClient() {
                       </Pill>
                     ))}
                   </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <FieldLabel>Preferences / boundaries</FieldLabel>
+                  <p className="mt-1 text-meta text-ink-secondary">
+                    A short line the clinician sees up top.
+                  </p>
+                  <textarea
+                    value={profile.patient_preferences}
+                    onChange={(e) => update("patient_preferences", e.target.value)}
+                    onBlur={flashSaved}
+                    rows={2}
+                    placeholder="e.g. Please don't ask about transition unless clinically relevant today. Warn before drawing blood."
+                    className="mt-2 w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Button asChild className="w-full">
+                    <Link href="/document">
+                      Create My Previsit Card
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </Disclosure>

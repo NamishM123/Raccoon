@@ -29,6 +29,7 @@ export interface Allergy {
 
 export interface Profile {
   display_name: string;
+  legal_name: string;
   pronouns: string;
   age: string;
   sex_assigned_at_birth: "male" | "female" | "intersex" | "";
@@ -38,6 +39,7 @@ export interface Profile {
   medications: Medication[];
   surgeries: Surgery[];
   recent_labs: LabValue[];
+  patient_preferences: string;
   share_anonymously: boolean;
 }
 
@@ -46,6 +48,7 @@ const STORAGE_KEY = "seagull_profile_v1";
 export function emptyProfile(): Profile {
   return {
     display_name: "",
+    legal_name: "",
     pronouns: "",
     age: "",
     sex_assigned_at_birth: "",
@@ -55,6 +58,7 @@ export function emptyProfile(): Profile {
     medications: [],
     surgeries: [],
     recent_labs: [],
+    patient_preferences: "",
     share_anonymously: false,
   };
 }
@@ -86,6 +90,8 @@ export function newId(): string {
 function migrate(p: any): Profile {
   if (!Array.isArray(p.allergies)) p.allergies = [];
   if (typeof p.anatomical_inventory !== "string") p.anatomical_inventory = "";
+  if (typeof p.legal_name !== "string") p.legal_name = "";
+  if (typeof p.patient_preferences !== "string") p.patient_preferences = "";
   if (Array.isArray(p.medications)) {
     p.medications = p.medications.map((m: any) => {
       if (typeof m?.description === "string") return { id: m.id || newId(), description: m.description };
