@@ -119,6 +119,7 @@ export function PlacesClient() {
     regimen_summary: string;
     medications: Array<{ description: string }>;
     surgeries: Array<{ description: string; date: string }>;
+    allergies: Array<{ substance: string; reaction: string }>;
   }) {
     setProfile((p) => ({
       ...p,
@@ -130,6 +131,14 @@ export function PlacesClient() {
       surgeries: [
         ...p.surgeries,
         ...result.surgeries.map((s) => ({ id: newId(), description: s.description, date: s.date })),
+      ],
+      allergies: [
+        ...p.allergies,
+        ...result.allergies.map((a) => ({
+          id: newId(),
+          substance: a.substance,
+          reaction: a.reaction,
+        })),
       ],
     }));
     flashSaved();
@@ -444,6 +453,7 @@ function SmartFill({
     regimen_summary: string;
     medications: Array<{ description: string }>;
     surgeries: Array<{ description: string; date: string }>;
+    allergies: Array<{ substance: string; reaction: string }>;
   }) => void;
 }) {
   const [text, setText] = useState("");

@@ -11,13 +11,15 @@ Return VALID JSON ONLY with this exact shape:
 {
   "regimen_summary": "1 short sentence summarizing their hormone regimen, or empty string",
   "medications": [ { "description": "single line like 'Estradiol 4mg IM weekly since Jan 2022'" } ],
-  "surgeries": [ { "description": "procedure name, e.g. 'Top surgery'", "date": "date as written, or empty string" } ]
+  "surgeries": [ { "description": "procedure name, e.g. 'Top surgery'", "date": "date as written, or empty string" } ],
+  "allergies": [ { "substance": "drug or substance name", "reaction": "what happens, or empty string" } ]
 }
 
 Rules:
 - Each medication is ONE string. Pack dose, route, frequency, and start date into the description naturally.
 - Surgery descriptions should be procedure name only; the date goes in its own field.
 - If the user mentions blockers (spironolactone, finasteride, bicalutamide, GnRH agonists), list them as separate medications.
+- For allergies, capture each as a separate entry with the substance and (if mentioned) the reaction. Do not list current medications as allergies.
 - Do NOT add medical advice or commentary. JSON only, no prose.`;
 
 export async function POST(req: Request) {
@@ -65,6 +67,7 @@ function extractJson(text: string): null | {
   regimen_summary: string;
   medications: Array<{ description: string }>;
   surgeries: Array<{ description: string; date: string }>;
+  allergies: Array<{ substance: string; reaction: string }>;
 } {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -85,6 +88,14 @@ function extractJson(text: string): null | {
               date: String(s?.date || "").trim(),
             }))
             .filter((s: { description: string }) => s.description)
+        : [],
+      allergies: Array.isArray(obj?.allergies)
+        ? obj.allergies
+            .map((a: any) => ({
+              substance: String(a?.substance || "").trim(),
+              reaction: String(a?.reaction || "").trim(),
+            }))
+            .filter((a: { substance: string }) => a.substance)
         : [],
     };
   } catch {
