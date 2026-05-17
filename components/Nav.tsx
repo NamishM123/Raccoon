@@ -10,6 +10,7 @@ const TOOL_LINKS = [
   { href: "/places", label: "Your Profile" },
   { href: "/document", label: "Previsit Card" },
   { href: "/analysis", label: "After Visit" },
+  { href: "/trajectory", label: "Data Trajectory" },
   { href: "/continuity", label: "Lab Check" },
   { href: "/map", label: "Care Map" },
 ];

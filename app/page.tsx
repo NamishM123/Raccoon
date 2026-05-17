@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User, ExternalLink, NotebookText } from "lucide-react";
+import { FileText, Map as MapIcon, FlaskConical, ArrowRight, ArrowDown, User, ExternalLink, NotebookText, TrendingUp } from "lucide-react";
 import { Container } from "@/components/Container";
 import { GlassButton, GlassFilter } from "@/components/ui/liquid-glass";
 import { WaveBackground } from "@/components/WaveBackground";
@@ -84,6 +84,12 @@ function ToolCards() {
       desc: "Upload your visit notes. Get a plain language breakdown checked against your own data.",
     },
     {
+      href: "/trajectory",
+      icon: TrendingUp,
+      title: "Data Trajectory",
+      desc: "Plot your lab values over time, see your trendline, and test how changes could shift your numbers.",
+    },
+    {
       href: "/continuity",
       icon: FlaskConical,
       title: "Lab Check",
@@ -107,7 +113,7 @@ function ToolCards() {
         }}
       />
       <Container className="relative">
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           {tools.map((t) => (
             <Link
               key={t.href}

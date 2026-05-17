@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Sparkles,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { Container } from "@/components/Container";
@@ -296,7 +297,18 @@ function AnalysisResults({ result }: { result: AnalysisResult }) {
 
 function TimelineGrid({ items }: { items: TimelineItem[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const activeItem = activeIndex !== null ? items[activeIndex] : null;
+
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      if (activeIndex !== null && drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+        setActiveIndex(null);
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [activeIndex]);
 
   return (
     <>
@@ -314,6 +326,7 @@ function TimelineGrid({ items }: { items: TimelineItem[] }) {
 
       {/* Drawer panel — no backdrop, everything behind stays interactive */}
       <div
+        ref={drawerRef}
         className={cn(
           "fixed top-16 right-0 bottom-0 z-30 w-full max-w-md flex flex-col",
           "border-l border-white/50",
@@ -507,6 +520,14 @@ function ComparisonCard({ comparison }: { comparison: Comparison }) {
               bold
             />
           </p>
+
+          <a
+            href={`/trajectory?tab=testable&rec=${encodeURIComponent(comparison.detail)}`}
+            className="mt-3 inline-flex items-center gap-1.5 text-meta font-medium text-brand hover:text-brand/70 transition-colors"
+          >
+            <TrendingUp className="h-3.5 w-3.5" />
+            View how this could affect you
+          </a>
         </div>
       </div>
     </div>
