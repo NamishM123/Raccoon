@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   UserCircle2,
@@ -17,7 +17,9 @@ import {
   BookOpen,
   ExternalLink,
   Microscope,
+  Pill as PillIcon,
 } from "lucide-react";
+import type { Medication } from "@/lib/profile";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Button } from "@/components/Button";
@@ -676,6 +678,7 @@ function SingleValueCheck({ profile }: { profile: Profile }) {
           result={result}
           labName={labName}
           regimen={profile.hormone_regimen_summary || ""}
+          profile={profile}
         />
       )}
     </div>
@@ -686,10 +689,12 @@ function SingleResult({
   result,
   labName,
   regimen,
+  profile,
 }: {
   result: LabInterpretation;
   labName: string;
   regimen: string;
+  profile: Profile;
 }) {
   const meta =
     VERDICT_META[result.verdict as Verdict] || VERDICT_META.borderline_ask_doctor;
@@ -720,6 +725,119 @@ function SingleResult({
         </div>
       )}
       <Citations labName={labName} regimen={regimen} />
+      <DailyMedContext labName={labName} medications={profile?.medications ?? []} />
+    </div>
+  );
+}
+
+// ── DailyMed context ──────────────────────────────────────────────────────────
+// Shows drug label sections (warnings, adverse reactions, lab interactions)
+// for each of the user's profile medications, fetched from NLM DailyMed.
+
+interface DailyMedLabel {
+  name: string;
+  setId: string;
+  sections: Array<{ title: string; text: string }>;
+}
+
+function DailyMedContext({
+  labName,
+  medications,
+}: {
+  labName: string;
+  medications: Medication[];
+}) {
+  const drugs = useMemo(
+    () => medications.map(m => m.description.split(/[\s,·]+/)[0]).filter(Boolean),
+    [medications]
+  );
+  const [labels, setLabels] = useState<DailyMedLabel[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [fetched, setFetched] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!labName || !drugs.length) return;
+    setFetched(false);
+    setLabels([]);
+  }, [labName]);
+
+  async function load() {
+    if (busy || fetched || !drugs.length) return;
+    setBusy(true);
+    try {
+      const results = await Promise.all(
+        drugs.map((d: string) =>
+          fetch(`/api/dailymed?drug=${encodeURIComponent(d)}`)
+            .then((r: Response) => r.json())
+            .then((j: { label: DailyMedLabel | null }) => j.label)
+            .catch(() => null)
+        )
+      );
+      setLabels(results.filter((l): l is DailyMedLabel => l !== null && l.sections.length > 0));
+    } finally {
+      setBusy(false);
+      setFetched(true);
+      setOpen(true);
+    }
+  }
+
+  if (!drugs.length || !labName) return null;
+
+  return (
+    <div className="mt-4 border-t border-divider pt-4">
+      {!fetched ? (
+        <button
+          onClick={load}
+          disabled={busy}
+          className="inline-flex items-center gap-2 text-meta text-brand hover:text-brand/70 transition-colors disabled:opacity-50"
+        >
+          {busy
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading drug label context…</>
+            : <><PillIcon className="h-3.5 w-3.5" /> View medication label context from DailyMed</>
+          }
+        </button>
+      ) : (
+        <div>
+          <button
+            onClick={() => setOpen(v => !v)}
+            className="inline-flex items-center gap-2 text-meta font-semibold text-ink-primary hover:text-brand transition-colors"
+          >
+            <PillIcon className="h-3.5 w-3.5 text-brand" />
+            Medication label context
+            <span className="text-ink-secondary font-normal">
+              ({labels.length} drug{labels.length !== 1 ? "s" : ""} found)
+            </span>
+          </button>
+
+          {open && labels.length > 0 && (
+            <div className="mt-3 space-y-4">
+              {labels.map(label => (
+                <div key={label.setId} className="rounded-xl border border-divider bg-surface-inset/40 px-4 py-3">
+                  <p className="text-meta font-bold text-ink-primary mb-2">{label.name}</p>
+                  {label.sections.map((s, i) => (
+                    <div key={i} className="mt-2">
+                      <p className="text-[11px] uppercase tracking-[0.1em] font-semibold text-ink-secondary">{s.title}</p>
+                      <p className="mt-1 text-meta text-ink-secondary leading-relaxed">{s.text}</p>
+                    </div>
+                  ))}
+                  <a
+                    href={`https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${label.setId}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[12px] text-brand hover:underline"
+                  >
+                    Full label on DailyMed <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {open && fetched && labels.length === 0 && (
+            <p className="mt-2 text-meta text-ink-secondary">No label data found for your current medications.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

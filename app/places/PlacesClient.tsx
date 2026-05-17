@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical, Siren, Lock, HeartHandshake, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical, Siren, Lock, HeartHandshake, ArrowRight, Zap } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Button } from "@/components/Button";
@@ -226,6 +226,7 @@ export function PlacesClient() {
             </Section>
 
             <DrugSafety medications={profile.medications} />
+            <DrugInteractions medications={profile.medications} />
 
             <Section
               title="Surgical History"
@@ -1076,6 +1077,118 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-card bg-surface-inset px-5 py-4 text-meta text-ink-secondary">
       {children}
+    </div>
+  );
+}
+
+// ── Drug Interactions (NLM RxNav) ─────────────────────────────────────────────
+
+interface Interaction {
+  drug1: string; drug2: string;
+  severity: string; description: string; sourceUrl: string;
+}
+
+const SEVERITY_META: Record<string, { label: string; color: string; bg: string }> = {
+  "N/A":          { label: "Minor",           color: "text-sky-600",    bg: "bg-sky-50 border-sky-200" },
+  "high":         { label: "Serious",         color: "text-red-600",    bg: "bg-red-50 border-red-200" },
+  "N/A (Drug-Drug Interaction)": { label: "Interaction", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+};
+
+function severityMeta(s: string) {
+  return SEVERITY_META[s] ?? { label: s || "Interaction", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" };
+}
+
+function DrugInteractions({ medications }: { medications: Medication[] }) {
+  const meds = useMemo(
+    () => medications.map(m => m.description).filter(Boolean),
+    [medications]
+  );
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run() {
+    if (meds.length < 2 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meds }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data?.error || "Couldn't check interactions.");
+      else {
+        setInteractions(data.interactions ?? []);
+        setCheckedAt(new Date().toLocaleString());
+      }
+    } catch (e: any) {
+      setError(e?.message || "Network error.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (meds.length < 2) return null;
+
+  return (
+    <div className="glass rounded-card p-7">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Zap className="h-7 w-7 text-amber-500" />
+            <h2 className="text-subsection">Drug Interaction Check</h2>
+          </div>
+          <p className="mt-1 text-meta text-ink-secondary">
+            Live check via NLM RxNav for known interactions between your medications.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={run} disabled={busy}>
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Checking…</> : <>Check now</>}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mt-4 rounded-card bg-status-banned/10 px-4 py-3 text-meta text-status-banned">{error}</div>
+      )}
+
+      {checkedAt && (
+        <div className="mt-5 space-y-3">
+          <p className="text-meta text-ink-secondary">
+            Checked {checkedAt} · {interactions.length === 0
+              ? <span className="text-status-protected font-medium">No known interactions found between your medications.</span>
+              : <span className="font-medium">{interactions.length} interaction{interactions.length > 1 ? "s" : ""} found.</span>
+            }
+          </p>
+
+          {interactions.map((ix, i) => {
+            const meta = severityMeta(ix.severity);
+            return (
+              <div key={i} className={cn("rounded-xl border px-5 py-4", meta.bg)}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-ink-primary capitalize">{ix.drug1}</span>
+                    <span className="text-ink-secondary text-meta">+</span>
+                    <span className="font-semibold text-ink-primary capitalize">{ix.drug2}</span>
+                  </div>
+                  <span className={cn("shrink-0 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border", meta.color, meta.bg)}>
+                    {meta.label}
+                  </span>
+                </div>
+                <p className="mt-2 text-meta text-ink-secondary leading-relaxed">{ix.description}</p>
+                {ix.sourceUrl && (
+                  <a href={ix.sourceUrl} target="_blank" rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[12px] text-brand hover:underline">
+                    Source <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

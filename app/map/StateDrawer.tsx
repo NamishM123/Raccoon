@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, X, AlertTriangle } from "lucide-react";
+import { ChevronDown, ExternalLink, FileText, Loader2, X, AlertTriangle } from "lucide-react";
 import { StatusPill } from "@/components/Pill";
 import { Button } from "@/components/Button";
 import { PROCEDURE_KEYS, PROCEDURE_LABELS } from "@/data/care_status";
@@ -77,6 +77,8 @@ export function StateDrawer({
           ))}
         </div>
 
+        <ActiveBills stateCode={state.state_code} />
+
         <div className="px-7 pb-6">
           <div className="rounded-card bg-status-restricted/10 p-5 flex gap-3 items-start">
             <AlertTriangle className="h-5 w-5 text-status-restricted mt-0.5 shrink-0" />
@@ -133,6 +135,113 @@ export function StateDrawer({
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ── Live legislation from Trans Legislation Tracker ───────────────────────────
+
+interface Bill {
+  id: string; state: string; bill_number: string;
+  title: string; status: string; category: string;
+  url: string; last_action_date: string;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  passed:  "bg-red-100 text-red-700",
+  failed:  "bg-emerald-100 text-emerald-700",
+  dead:    "bg-emerald-100 text-emerald-700",
+  carried: "bg-amber-100 text-amber-700",
+  introduced: "bg-sky-100 text-sky-700",
+  referred:   "bg-sky-100 text-sky-700",
+};
+
+function billColor(status: string) {
+  const key = status.toLowerCase();
+  return Object.entries(STATUS_COLORS).find(([k]) => key.includes(k))?.[1]
+    ?? "bg-surface-inset text-ink-secondary";
+}
+
+function ActiveBills({ stateCode }: { stateCode: string }) {
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [open, setOpen] = useState(true);
+
+  useEffect(() => {
+    setBills([]); setLoaded(false);
+    setBusy(true);
+    fetch(`/api/legislation?state=${stateCode}`)
+      .then(r => r.json())
+      .then(d => { setBills(d.bills ?? []); setLoaded(true); })
+      .catch(() => setLoaded(true))
+      .finally(() => setBusy(false));
+  }, [stateCode]);
+
+  return (
+    <div className="px-7 pb-6">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-2 mb-3"
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-brand" />
+          <h3 className="text-card font-bold text-ink-primary">Active Legislation</h3>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-secondary" />}
+          {loaded && (
+            <span className="text-[11px] font-semibold text-ink-secondary bg-surface-inset px-2 py-0.5 rounded-full">
+              {bills.length}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-4 w-4 text-ink-secondary transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          {loaded && bills.length === 0 && (
+            <p className="text-meta text-ink-secondary">
+              No active bills found for this state in the Trans Legislation Tracker.
+            </p>
+          )}
+          <div className="space-y-2">
+            {bills.map(b => (
+              <div key={b.id} className="rounded-xl border border-divider bg-surface-inset/40 px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-[11px] font-bold text-ink-secondary">{b.bill_number}</span>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${billColor(b.status)}`}>
+                        {b.status}
+                      </span>
+                      {b.category && (
+                        <span className="text-[10px] text-ink-secondary">{b.category}</span>
+                      )}
+                    </div>
+                    <p className="text-meta text-ink-primary leading-snug">{b.title}</p>
+                    {b.last_action_date && (
+                      <p className="text-[11px] text-ink-secondary mt-1">
+                        Last action: {b.last_action_date}
+                      </p>
+                    )}
+                  </div>
+                  {b.url && (
+                    <a href={b.url} target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 text-brand hover:text-brand/70 transition-colors mt-0.5">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {loaded && bills.length > 0 && (
+            <p className="mt-2 text-[11px] text-ink-secondary">
+              Source: Trans Legislation Tracker · Refreshed hourly
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }
