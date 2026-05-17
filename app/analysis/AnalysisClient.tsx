@@ -5,14 +5,26 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  Download,
   FileText,
   HelpCircle,
   Image as ImageIcon,
   Loader2,
   Sparkles,
+  Trash2,
   TrendingUp,
   X,
 } from "lucide-react";
+import {
+  deleteAnalysis,
+  downloadBlob,
+  getAnalysis,
+  listAnalyses,
+  newId,
+  saveAnalysis,
+  type AnalysisMeta,
+} from "@/lib/analysisStore";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Button } from "@/components/Button";
@@ -94,28 +106,43 @@ export function AnalysisClient() {
 
 // ── Upload + analysis orchestrator ────────────────────────────────────────────
 
-const ANALYSIS_STORAGE_KEY = "seagull_analysis_v1";
-
 function UploadAndAnalyze({ profile }: { profile: Profile }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<AnalysisMeta[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(ANALYSIS_STORAGE_KEY);
-      if (raw) setResult(JSON.parse(raw));
-    } catch {}
+    listAnalyses().then(setHistory).catch(() => {});
   }, []);
 
   function pickFile(f: File | null) {
     setError(null);
-    setResult(null);
-    if (f === null) localStorage.removeItem(ANALYSIS_STORAGE_KEY);
     setFile(f);
+  }
+
+  async function loadRecord(id: string) {
+    const record = await getAnalysis(id);
+    if (!record) return;
+    setResult(record.result as AnalysisResult);
+    setActiveId(id);
+    setFile(null);
+  }
+
+  async function handleDelete(id: string) {
+    await deleteAnalysis(id);
+    const updated = await listAnalyses();
+    setHistory(updated);
+    if (activeId === id) { setResult(null); setActiveId(null); }
+  }
+
+  async function handleDownload(id: string) {
+    const record = await getAnalysis(id);
+    if (record) downloadBlob(record.fileBlob, record.filename);
   }
 
   async function analyze() {
@@ -123,6 +150,7 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
     setBusy(true);
     setError(null);
     setResult(null);
+    setActiveId(null);
     try {
       const form = new FormData();
       form.append("file", file);
@@ -132,8 +160,22 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
       if (!res.ok || data?.error) {
         setError(data?.error || "Couldn't analyze that document.");
       } else {
+        const id = newId();
+        const record = {
+          id,
+          filename: file.name,
+          fileType: file.type,
+          fileBlob: new Blob([await file.arrayBuffer()], { type: file.type }),
+          analyzedAt: new Date().toISOString(),
+          visitDate: (data as AnalysisResult).visit_date ?? "",
+          provider: (data as AnalysisResult).provider ?? "",
+          result: data,
+        };
+        await saveAnalysis(record);
+        const updated = await listAnalyses();
+        setHistory(updated);
         setResult(data as AnalysisResult);
-        try { localStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(data)); } catch {}
+        setActiveId(id);
       }
     } catch (e: any) {
       setError(e?.message || "Network error.");
@@ -143,8 +185,19 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Upload card */}
+    <div className="flex flex-col gap-6">
+      {/* ── History panel ─────────────────────────────────────────── */}
+      {history.length > 0 && (
+        <HistoryPanel
+          history={history}
+          activeId={activeId}
+          onLoad={loadRecord}
+          onDownload={handleDownload}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {/* ── Upload card ───────────────────────────────────────────── */}
       <div className="glass rounded-card p-7">
         <h2 className="text-subsection">Upload Your Visit Notes</h2>
         <p className="mt-2 text-meta text-ink-secondary leading-relaxed">
@@ -208,10 +261,7 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="text-meta text-ink-secondary">
-            {result
-              ? <button onClick={() => { setResult(null); setFile(null); localStorage.removeItem(ANALYSIS_STORAGE_KEY); }} className="underline underline-offset-4 hover:text-ink-primary transition-colors">Clear saved results</button>
-              : "Sent once for analysis, then discarded. Nothing is stored."
-            }
+            Stored privately in your browser. Never sent to a server.
           </span>
           <Button onClick={analyze} disabled={!file || busy}>
             {busy ? (
@@ -230,6 +280,111 @@ function UploadAndAnalyze({ profile }: { profile: Profile }) {
       </div>
 
       {result && <AnalysisResults result={result} />}
+    </div>
+  );
+}
+
+// ── History panel ────────────────────────────────────────────────────────────
+
+function HistoryPanel({
+  history,
+  activeId,
+  onLoad,
+  onDownload,
+  onDelete,
+}: {
+  history: AnalysisMeta[];
+  activeId: string | null;
+  onLoad: (id: string) => void;
+  onDownload: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  function fmtDate(iso: string) {
+    if (!iso) return "";
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  return (
+    <div className="glass rounded-card overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-white/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <FileText className="h-4 w-4 text-brand" />
+          <span className="text-body font-bold text-ink-primary">
+            Saved Analyses
+          </span>
+          <span className="text-[12px] font-semibold text-ink-secondary bg-surface-inset px-2 py-0.5 rounded-full">
+            {history.length}
+          </span>
+        </div>
+        <ChevronDown className={cn("h-4 w-4 text-ink-secondary transition-transform duration-200", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="border-t border-black/[0.05] divide-y divide-black/[0.04]">
+          {history.map((h) => (
+            <div
+              key={h.id}
+              className={cn(
+                "flex items-center gap-3 px-6 py-3.5 transition-colors",
+                h.id === activeId ? "bg-brand/8" : "hover:bg-white/40"
+              )}
+            >
+              {/* File icon */}
+              <div className={cn(
+                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase",
+                h.fileType === "application/pdf"
+                  ? "bg-red-100 text-red-600"
+                  : "bg-sky-100 text-sky-600"
+              )}>
+                {h.fileType === "application/pdf" ? "PDF" : "IMG"}
+              </div>
+
+              {/* Meta */}
+              <button
+                onClick={() => onLoad(h.id)}
+                className="flex-1 min-w-0 text-left"
+              >
+                <p className={cn(
+                  "text-meta font-semibold truncate",
+                  h.id === activeId ? "text-brand" : "text-ink-primary"
+                )}>
+                  {h.filename}
+                </p>
+                <p className="text-[12px] text-ink-secondary mt-0.5">
+                  {h.provider
+                    ? <>{h.provider}{h.visitDate ? ` · ${h.visitDate}` : ""}</>
+                    : h.visitDate || fmtDate(h.analyzedAt)
+                  }
+                  <span className="ml-2 opacity-60">· Analyzed {fmtDate(h.analyzedAt)}</span>
+                </p>
+              </button>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => onDownload(h.id)}
+                  className="p-1.5 rounded-lg text-ink-secondary hover:text-brand hover:bg-brand/10 transition-colors"
+                  title="Download original file"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => onDelete(h.id)}
+                  className="p-1.5 rounded-lg text-ink-secondary hover:text-status-banned hover:bg-status-banned/10 transition-colors"
+                  title="Delete this analysis"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
