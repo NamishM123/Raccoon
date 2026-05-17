@@ -547,51 +547,36 @@ export function DocumentClient() {
             padding: 0 !important;
             background: white !important;
             color: #0a0a0a !important;
-          }
-          /* Hide everything except the path to .printable-card.
-             :has(.printable-card) is true for every ancestor of the card,
-             so they stay laid out (display: revert). The card and its
-             descendants are explicitly re-shown below. */
-          body *:not(:has(.printable-card)):not(.printable-card) {
-            display: none !important;
-          }
-          body:has(.printable-card),
-          *:has(.printable-card) {
-            display: block !important;
             position: static !important;
-            transform: none !important;
-            filter: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-            background: white !important;
-            background-image: none !important;
-            box-shadow: none !important;
-            border: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
-            grid-template-columns: none !important;
-            grid-template-rows: none !important;
-            column-gap: 0 !important;
-            row-gap: 0 !important;
-            gap: 0 !important;
           }
-          /* Pseudo-elements on .page-ocean would otherwise paint over. */
+          /* Kill ambient page backdrops. */
           .page-ocean::before,
           .page-ocean::after {
             display: none !important;
             content: none !important;
           }
+          /* Hide everything via visibility so layout space is preserved but
+             nothing paints. Strip positioning + transforms from every
+             ancestor so .printable-card's position:absolute pins to <body>
+             instead of inheriting an offset parent (.page-ocean was
+             position:relative, which caused the card to print centered). */
+          body * {
+            visibility: hidden !important;
+            position: static !important;
+            transform: none !important;
+            filter: none !important;
+          }
           .printable-card,
           .printable-card * {
-            display: revert !important;
+            visibility: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           .printable-card {
-            position: static !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
@@ -604,23 +589,6 @@ export function DocumentClient() {
             font-size: 10.5pt;
             line-height: 1.4;
             color: #0a0a0a;
-          }
-          /* Re-establish flex/grid display on internal layout helpers that
-             may have been clobbered by the ancestor reset. */
-          .printable-card .flex {
-            display: flex !important;
-          }
-          .printable-card .grid {
-            display: grid !important;
-          }
-          .printable-card ul {
-            display: block !important;
-          }
-          .printable-card ol {
-            display: block !important;
-          }
-          .printable-card li {
-            display: list-item !important;
           }
           /* Sections shouldn't split across pages. */
           .printable-card > * {
