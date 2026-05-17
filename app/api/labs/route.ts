@@ -1,5 +1,6 @@
 import { anthropic, MODEL } from "@/lib/anthropic";
 import { profileForPrompt, type Profile } from "@/lib/profile";
+import { interpretLab, statusLabel } from "@/lib/lab_ranges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +49,15 @@ export async function POST(req: Request) {
     });
   }
 
-  const userContent = buildUserPrompt(body);
+  // Deterministic interpretation against our hard-coded WPATH targets,
+  // independent of the LLM. The LLM gets to see this and explain it in plain
+  // language — but the verdict is anchored to a real reference.
+  const ranged = interpretLab(
+    { name: body.lab_name, value: body.value, unit: body.unit },
+    body.profile as Profile
+  );
+
+  const userContent = buildUserPrompt(body, ranged);
 
   try {
     const res = await anthropic().messages.create({
@@ -72,12 +81,13 @@ export async function POST(req: Request) {
           explanation:
             "The model didn't return a clean answer. That's on us, not you. When in doubt, ask your doctor — and consider rephrasing the lab name (e.g. \"hematocrit\" rather than \"HCT %\").",
           ask_doctor_about: "",
+          range: ranged,
         }),
         { headers: { "content-type": "application/json" } }
       );
     }
 
-    return new Response(JSON.stringify(parsed), {
+    return new Response(JSON.stringify({ ...parsed, range: ranged }), {
       headers: { "content-type": "application/json" },
     });
   } catch (e: any) {
@@ -90,8 +100,20 @@ export async function POST(req: Request) {
   }
 }
 
-function buildUserPrompt(p: Payload): string {
+function buildUserPrompt(p: Payload, ranged: ReturnType<typeof interpretLab>): string {
   const ctx = profileForPrompt(p.profile as Profile);
+  const rangeBlock = ranged.matched
+    ? [
+        `Deterministic target check for ${ranged.display}:`,
+        `- Status: ${statusLabel(ranged.status)}`,
+        ranged.low !== null && ranged.high !== null
+          ? `- Target range: ${ranged.low}–${ranged.high} ${ranged.expectedUnit}`
+          : null,
+        ranged.note ? `- Note: ${ranged.note}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "No hard-coded target range matched this lab.";
   return [
     `Lab: ${p.lab_name}`,
     `Value: ${p.value}${p.unit ? " " + p.unit : ""}`,
@@ -99,7 +121,9 @@ function buildUserPrompt(p: Payload): string {
     "Patient context:",
     ctx || "- (no profile data provided)",
     "",
-    "Interpret this result. Return JSON only.",
+    rangeBlock,
+    "",
+    "Interpret this result. Use the deterministic check above as your anchor — don't contradict it without good reason. Return JSON only.",
   ].join("\n");
 }
 

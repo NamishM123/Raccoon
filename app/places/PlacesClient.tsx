@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical } from "lucide-react";
+import { Plus, Trash2, Save, ShieldCheck, Sparkles, ChevronDown, Loader2, Wand2, AlertTriangle, CheckCircle2, ExternalLink, FlaskConical, Heart, Activity } from "lucide-react";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
 import { cn } from "@/lib/cn";
 import {
+  ageFromDob,
   emptyProfile,
+  inferHrtDirection,
   loadProfile,
   newId,
   saveProfile,
+  type Allergy,
+  type AnatomyInventory,
+  type AnatomyState,
+  type HrtDirection,
   type LabValue,
   type Medication,
   type Profile,
@@ -94,6 +100,27 @@ export function PlacesClient() {
   }
   function removeLab(id: string) {
     setProfile((p) => ({ ...p, recent_labs: p.recent_labs.filter((l) => l.id !== id) }));
+  }
+
+  function addAllergy() {
+    setProfile((p) => ({
+      ...p,
+      allergies: [...p.allergies, { id: newId(), substance: "", reaction: "" }],
+    }));
+  }
+  function updateAllergy(id: string, patch: Partial<Allergy>) {
+    setProfile((p) => ({
+      ...p,
+      allergies: p.allergies.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    }));
+  }
+  function removeAllergy(id: string) {
+    setProfile((p) => ({ ...p, allergies: p.allergies.filter((a) => a.id !== id) }));
+  }
+
+  function setAnatomy(key: keyof AnatomyInventory, value: AnatomyState) {
+    setProfile((p) => ({ ...p, anatomy: { ...p.anatomy, [key]: value } }));
+    flashSaved();
   }
 
   function applySmartFill(result: {
@@ -196,6 +223,37 @@ export function PlacesClient() {
             </Section>
 
             <Section
+              title="Allergies"
+              subtitle="Shown in red at the top of the visit card and the wallet card."
+              action={
+                <Button size="sm" variant="secondary" onClick={addAllergy}>
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              }
+            >
+              {profile.allergies.length === 0 ? (
+                <EmptyHint>
+                  No allergies logged. If you have none, you can leave this empty —
+                  the card will show "No known allergies".
+                </EmptyHint>
+              ) : (
+                <div className="space-y-2">
+                  {profile.allergies.map((a) => (
+                    <AllergyRow
+                      key={a.id}
+                      allergy={a}
+                      onChange={(patch) => updateAllergy(a.id, patch)}
+                      onCommit={flashSaved}
+                      onRemove={() => removeAllergy(a.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            <AnatomySection anatomy={profile.anatomy} onSet={setAnatomy} />
+
+            <Section
               title="Recent labs"
               subtitle="Optional. Adds context when a new number looks off."
               action={
@@ -227,7 +285,7 @@ export function PlacesClient() {
               open={aboutOpen}
               onToggle={() => setAboutOpen((v) => !v)}
               label="About you (optional)"
-              hint="Only used to personalize the visit card."
+              hint="Personalizes the visit card and wallet card. Used locally."
             >
               <div className="grid sm:grid-cols-2 gap-4">
                 <TextField
@@ -243,13 +301,21 @@ export function PlacesClient() {
                   onCommit={flashSaved}
                   placeholder="she/her, they/them, …"
                 />
-                <TextField
-                  label="Age"
-                  value={profile.age}
-                  onChange={(v) => update("age", v)}
-                  onCommit={flashSaved}
-                  inputMode="numeric"
-                />
+                <div>
+                  <FieldLabel>Date of birth</FieldLabel>
+                  <input
+                    type="date"
+                    value={profile.dob}
+                    onChange={(e) => update("dob", e.target.value)}
+                    onBlur={flashSaved}
+                    className="mt-2 w-full rounded-btn border border-divider bg-surface px-3 py-2 text-body focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                  {ageFromDob(profile.dob) !== null && (
+                    <div className="mt-1 text-meta text-ink-secondary">
+                      Age {ageFromDob(profile.dob)}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <FieldLabel>Sex assigned at birth</FieldLabel>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -270,6 +336,52 @@ export function PlacesClient() {
                     ))}
                   </div>
                 </div>
+                <div className="sm:col-span-2">
+                  <FieldLabel>HRT direction</FieldLabel>
+                  <p className="mt-1 text-meta text-ink-secondary">
+                    Picks which lab target ranges Lab Check uses.
+                    {!profile.hrt_direction && inferHrtDirection(profile) && (
+                      <>
+                        {" "}Guess from your meds:{" "}
+                        <span className="text-ink-primary font-bold">
+                          {inferHrtDirection(profile)}
+                        </span>
+                        .
+                      </>
+                    )}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(["feminizing", "masculinizing", "nonbinary", "none"] as const).map((d) => (
+                      <Pill
+                        key={d}
+                        selected={profile.hrt_direction === d}
+                        onClick={() => {
+                          update(
+                            "hrt_direction",
+                            profile.hrt_direction === d ? "" : (d as HrtDirection)
+                          );
+                          flashSaved();
+                        }}
+                      >
+                        {d === "none" ? "Not on HRT" : d[0].toUpperCase() + d.slice(1)}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+                <TextField
+                  label="Emergency contact"
+                  value={profile.emergency_contact}
+                  onChange={(v) => update("emergency_contact", v)}
+                  onCommit={flashSaved}
+                  placeholder="Name + phone"
+                />
+                <TextField
+                  label="Prescribing provider"
+                  value={profile.provider_contact}
+                  onChange={(v) => update("provider_contact", v)}
+                  onCommit={flashSaved}
+                  placeholder="Clinic + phone"
+                />
               </div>
             </Disclosure>
           </div>
@@ -739,6 +851,115 @@ function SurgeryRow({
       >
         <Trash2 className="h-4 w-4" />
       </button>
+    </div>
+  );
+}
+
+function AllergyRow({
+  allergy,
+  onChange,
+  onCommit,
+  onRemove,
+}: {
+  allergy: Allergy;
+  onChange: (patch: Partial<Allergy>) => void;
+  onCommit: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-btn border border-status-banned/30 bg-status-banned/5 px-3 py-2">
+      <AlertTriangle className="h-4 w-4 text-status-banned shrink-0" />
+      <input
+        value={allergy.substance}
+        onChange={(e) => onChange({ substance: e.target.value })}
+        onBlur={onCommit}
+        placeholder="Substance (e.g. penicillin, latex)"
+        className="flex-[2] bg-transparent text-body focus:outline-none"
+      />
+      <input
+        value={allergy.reaction}
+        onChange={(e) => onChange({ reaction: e.target.value })}
+        onBlur={onCommit}
+        placeholder="Reaction (e.g. hives, anaphylaxis)"
+        className="flex-[2] min-w-0 bg-transparent text-body text-ink-secondary focus:outline-none border-l border-divider pl-2"
+      />
+      <button
+        onClick={onRemove}
+        className="text-ink-secondary hover:text-status-banned p-1"
+        aria-label="Remove allergy"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+const ANATOMY_FIELDS: Array<{
+  key: keyof AnatomyInventory;
+  label: string;
+  hint: string;
+}> = [
+  { key: "cervix", label: "Cervix", hint: "Pap smear screening depends on this." },
+  { key: "uterus", label: "Uterus", hint: "" },
+  { key: "ovaries", label: "Ovaries", hint: "" },
+  { key: "breasts", label: "Breast tissue", hint: "Mammogram screening depends on this." },
+  { key: "prostate", label: "Prostate", hint: "Still present after bottom surgery." },
+  { key: "testes", label: "Testes", hint: "" },
+  { key: "penis", label: "Penis", hint: "" },
+];
+
+function AnatomySection({
+  anatomy,
+  onSet,
+}: {
+  anatomy: AnatomyInventory;
+  onSet: (key: keyof AnatomyInventory, value: AnatomyState) => void;
+}) {
+  return (
+    <div className="glass rounded-card p-7">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Heart className="h-5 w-5 text-accent" />
+            <h2 className="text-subsection">Anatomy inventory</h2>
+          </div>
+          <p className="mt-1 text-meta text-ink-secondary leading-relaxed">
+            What organs are present. This is what tells a doctor whether to do a Pap,
+            a prostate exam, a mammogram. Optional — leave blank if you'd rather not.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 grid sm:grid-cols-2 gap-3">
+        {ANATOMY_FIELDS.map((f) => (
+          <div
+            key={f.key}
+            className="rounded-btn border border-divider bg-surface px-3 py-2"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-body text-ink-primary">{f.label}</div>
+              <div className="flex gap-1">
+                {(["present", "absent", ""] as const).map((v) => (
+                  <button
+                    key={v || "unknown"}
+                    onClick={() => onSet(f.key, v)}
+                    className={cn(
+                      "text-meta px-2 py-1 rounded-chip transition-colors",
+                      anatomy[f.key] === v
+                        ? "bg-accent/15 text-accent font-bold"
+                        : "text-ink-secondary hover:bg-surface-inset"
+                    )}
+                  >
+                    {v === "" ? "Skip" : v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {f.hint && (
+              <div className="mt-1 text-meta text-ink-secondary">{f.hint}</div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

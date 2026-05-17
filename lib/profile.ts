@@ -21,15 +21,56 @@ export interface LabValue {
   date: string;
 }
 
+export interface Allergy {
+  id: string;
+  substance: string;
+  reaction: string;
+}
+
+export type HrtDirection = "" | "feminizing" | "masculinizing" | "nonbinary" | "none";
+
+// Tri-state per organ: present, absent (e.g. removed), or unknown/unspecified.
+// "" means the user hasn't answered yet; absent means they explicitly removed it
+// (relevant for "don't do a Pap, no cervix"). Doctors need the explicit
+// distinction — silence is not the same as "no".
+export type AnatomyState = "" | "present" | "absent";
+export interface AnatomyInventory {
+  cervix: AnatomyState;
+  uterus: AnatomyState;
+  ovaries: AnatomyState;
+  breasts: AnatomyState;
+  prostate: AnatomyState;
+  testes: AnatomyState;
+  penis: AnatomyState;
+}
+
+export function emptyAnatomy(): AnatomyInventory {
+  return {
+    cervix: "",
+    uterus: "",
+    ovaries: "",
+    breasts: "",
+    prostate: "",
+    testes: "",
+    penis: "",
+  };
+}
+
 export interface Profile {
   display_name: string;
   pronouns: string;
   age: string;
+  dob: string;
   sex_assigned_at_birth: "male" | "female" | "intersex" | "";
+  hrt_direction: HrtDirection;
   hormone_regimen_summary: string;
   medications: Medication[];
   surgeries: Surgery[];
   recent_labs: LabValue[];
+  allergies: Allergy[];
+  anatomy: AnatomyInventory;
+  emergency_contact: string;
+  provider_contact: string;
   share_anonymously: boolean;
 }
 
@@ -40,11 +81,17 @@ export function emptyProfile(): Profile {
     display_name: "",
     pronouns: "",
     age: "",
+    dob: "",
     sex_assigned_at_birth: "",
+    hrt_direction: "",
     hormone_regimen_summary: "",
     medications: [],
     surgeries: [],
     recent_labs: [],
+    allergies: [],
+    anatomy: emptyAnatomy(),
+    emergency_contact: "",
+    provider_contact: "",
     share_anonymously: false,
   };
 }
@@ -92,7 +139,43 @@ function migrate(p: any): Profile {
       return { id: s?.id || newId(), description: desc, date: s?.date || "" };
     });
   }
+  if (!Array.isArray(p.allergies)) p.allergies = [];
+  if (!p.anatomy || typeof p.anatomy !== "object") p.anatomy = emptyAnatomy();
+  else p.anatomy = { ...emptyAnatomy(), ...p.anatomy };
+  if (typeof p.dob !== "string") p.dob = "";
+  if (typeof p.hrt_direction !== "string") p.hrt_direction = "";
+  if (typeof p.emergency_contact !== "string") p.emergency_contact = "";
+  if (typeof p.provider_contact !== "string") p.provider_contact = "";
   return p as Profile;
+}
+
+export function ageFromDob(dob: string): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+// Free-text guess at HRT direction from regimen + meds. The user can always
+// override it explicitly — this is only the auto-suggestion.
+export function inferHrtDirection(p: Profile): HrtDirection {
+  if (p.hrt_direction) return p.hrt_direction;
+  const blob = [
+    p.hormone_regimen_summary,
+    ...p.medications.map((m) => m.description),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const fem = /(estradiol|estrogen|spirono|bicalutamide|finasteride|progester|cyproterone)/.test(blob);
+  const masc = /(testosterone|cypionate|enanthate|nebido|androgel|sustanon)/.test(blob);
+  if (fem && !masc) return "feminizing";
+  if (masc && !fem) return "masculinizing";
+  if (fem && masc) return "nonbinary";
+  return "";
 }
 
 function prettyOldRoute(r: string): string {
@@ -111,8 +194,11 @@ function prettyOldRoute(r: string): string {
 
 export function profileForPrompt(p: Profile): string {
   const lines: string[] = [];
-  if (p.age) lines.push(`- Age: ${p.age}`);
+  const age = ageFromDob(p.dob) ?? (p.age ? Number(p.age) : null);
+  if (age) lines.push(`- Age: ${age}`);
   if (p.sex_assigned_at_birth) lines.push(`- Sex assigned at birth: ${p.sex_assigned_at_birth}`);
+  const dir = inferHrtDirection(p);
+  if (dir) lines.push(`- HRT direction: ${dir}`);
   if (p.hormone_regimen_summary) lines.push(`- Regimen summary: ${p.hormone_regimen_summary}`);
   if (p.medications.length) {
     lines.push("- Medications:");
@@ -122,6 +208,21 @@ export function profileForPrompt(p: Profile): string {
     lines.push("- Surgical history:");
     for (const s of p.surgeries) {
       const bits = [s.description, s.date].filter(Boolean).join(" · ");
+      if (bits) lines.push(`   · ${bits}`);
+    }
+  }
+  const anatomyLines: string[] = [];
+  for (const [k, v] of Object.entries(p.anatomy)) {
+    if (v) anatomyLines.push(`   · ${k}: ${v}`);
+  }
+  if (anatomyLines.length) {
+    lines.push("- Anatomy inventory (patient-reported):");
+    lines.push(...anatomyLines);
+  }
+  if (p.allergies.length) {
+    lines.push("- Allergies:");
+    for (const a of p.allergies) {
+      const bits = [a.substance, a.reaction && `(${a.reaction})`].filter(Boolean).join(" ");
       if (bits) lines.push(`   · ${bits}`);
     }
   }

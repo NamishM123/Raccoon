@@ -23,6 +23,7 @@ import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
 import { cn } from "@/lib/cn";
 import { emptyProfile, loadProfile, type Profile } from "@/lib/profile";
+import { statusLabel, type LabInterpretation as RangeReading, type RangeStatus } from "@/lib/lab_ranges";
 
 type Verdict =
   | "likely_normal_for_regimen"
@@ -35,6 +36,7 @@ interface LabInterpretation {
   headline: string;
   explanation: string;
   ask_doctor_about: string;
+  range?: RangeReading;
 }
 
 interface ParsedItem {
@@ -692,6 +694,7 @@ function SingleResult({
           {meta.label}
         </span>
       </div>
+      {result.range?.matched && <RangeBar range={result.range} />}
       <div className="mt-3 flex items-start gap-3">
         <Icon className={cn("h-5 w-5 mt-0.5 shrink-0", meta.color)} />
         <div className="text-body text-ink-primary font-bold leading-snug">
@@ -710,6 +713,67 @@ function SingleResult({
         </div>
       )}
       <Citations labName={labName} regimen={regimen} />
+    </div>
+  );
+}
+
+function RangeBar({ range }: { range: RangeReading }) {
+  const statusColor: Record<RangeStatus, string> = {
+    "on-target": "text-status-protected bg-status-protected/10 border-status-protected/30",
+    monitor: "text-status-restricted bg-status-restricted/10 border-status-restricted/30",
+    high: "text-status-banned bg-status-banned/10 border-status-banned/30",
+    low: "text-status-banned bg-status-banned/10 border-status-banned/30",
+    unknown: "text-ink-secondary bg-surface border-divider",
+  };
+  const hasRange = range.low !== null && range.high !== null;
+  // Position the marker as a % across a band that extends 30% past each bound
+  // so out-of-range values still render visibly.
+  let markerPct = 50;
+  if (hasRange && range.numericValue !== null && range.low !== null && range.high !== null) {
+    const span = range.high - range.low;
+    if (span > 0) {
+      const padded = span * 0.4;
+      const min = range.low - padded;
+      const max = range.high + padded;
+      markerPct = Math.max(2, Math.min(98, ((range.numericValue - min) / (max - min)) * 100));
+    }
+  }
+  return (
+    <div className={cn("mt-4 rounded-card border p-4", statusColor[range.status])}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-meta uppercase tracking-[0.12em] font-bold">
+          {range.display} — {statusLabel(range.status)}
+        </div>
+        {range.numericValue !== null && (
+          <div className="text-card font-bold text-ink-primary">
+            {range.numericValue} {range.unit}
+          </div>
+        )}
+      </div>
+      {hasRange && (
+        <>
+          <div className="mt-3 relative h-2 rounded-full bg-surface overflow-visible">
+            {/* On-target band */}
+            <div
+              className="absolute top-0 bottom-0 bg-status-protected/30 rounded-full"
+              style={{ left: "28.57%", right: "28.57%" }}
+            />
+            <div
+              className="absolute -top-1 h-4 w-1 rounded-full bg-ink-primary shadow"
+              style={{ left: `${markerPct}%`, transform: "translateX(-50%)" }}
+              aria-label={`Your value at ${markerPct.toFixed(0)}% of the chart`}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-meta text-ink-secondary">
+            <span>{range.low} {range.expectedUnit}</span>
+            <span>target</span>
+            <span>{range.high} {range.expectedUnit}</span>
+          </div>
+        </>
+      )}
+      {range.note && (
+        <p className="mt-2 text-meta text-ink-primary leading-relaxed">{range.note}</p>
+      )}
     </div>
   );
 }
