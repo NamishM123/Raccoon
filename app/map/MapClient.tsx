@@ -205,7 +205,7 @@ export function MapClient() {
       <AuroraOverlay variant="violet" />
       <PageHero
         title="Where Your State Stands On Gender Affirming Care"
-        description="Pick a procedure and your insurance — the map recolors to show which states will actually cover the care."
+        description="Pick a procedure and your insurance. The map recolors to show which states will actually cover the care."
       />
       <Container className="pb-16 relative">
       <div className="glass rounded-card p-7 mb-8 flex items-start gap-4">
