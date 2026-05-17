@@ -46,24 +46,6 @@ export function USMap({
   return (
     <div className="relative">
       <ComposableMap projection="geoAlbersUsa" width={980} height={560}>
-        <defs>
-          <linearGradient id="centerPin" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#FF5A4E" />
-            <stop offset="100%" stopColor="#C5221F" />
-          </linearGradient>
-          <filter id="centerPinShadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="0.7" />
-            <feOffset dx="0" dy="0.6" result="offsetblur" />
-            <feComponentTransfer>
-              <feFuncA type="linear" slope="0.45" />
-            </feComponentTransfer>
-            <feMerge>
-              <feMergeNode />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
         <Geographies geography={US_TOPOLOGY_URL}>
           {({ geographies }) =>
             geographies.map((geo) => {
@@ -120,13 +102,14 @@ export function USMap({
         {showCenters &&
           CARE_CENTERS.map((c) => {
             const isHovered = centerHover?.center.id === c.id;
+            const scale = isHovered ? 1.3 : 1;
             return (
               <Marker
                 key={c.id}
                 coordinates={c.coordinates}
                 onMouseEnter={(e) => {
-                  const rect = (e.target as SVGElement).getBoundingClientRect();
-                  const parentRect = (e.target as SVGElement)
+                  const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
+                  const parentRect = (e.currentTarget as SVGElement)
                     .closest("svg")
                     ?.getBoundingClientRect();
                   setCenterHover({
@@ -139,29 +122,16 @@ export function USMap({
                 onClick={() => onSelect(c.state_code)}
                 style={{ default: { cursor: "pointer" } }}
               >
-                <g
-                  filter="url(#centerPinShadow)"
-                  style={{ transition: "transform 0.15s ease-out", transformOrigin: "0 0" }}
-                  transform={isHovered ? "scale(1.25)" : "scale(1)"}
-                >
-                  {/* ground shadow ellipse under the tip */}
-                  <ellipse
-                    cx={0}
-                    cy={0.6}
-                    rx={2.2}
-                    ry={0.6}
-                    fill="#000"
-                    opacity={0.25}
-                  />
-                  {/* teardrop pin body — tip at (0,0), head up */}
+                <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease-out" }}>
+                  <ellipse cx={0} cy={1} rx={2} ry={0.7} fill="#000" opacity={0.3} />
                   <path
-                    d="M0,0 C-1.4,-2.8 -4.2,-4.6 -4.2,-7.4 A4.2,4.2 0 1,1 4.2,-7.4 C4.2,-4.6 1.4,-2.8 0,0 Z"
-                    fill="url(#centerPin)"
+                    d="M0,1 C-1.4,-1.8 -4.2,-3.6 -4.2,-6.4 A4.2,4.2 0 1,1 4.2,-6.4 C4.2,-3.6 1.4,-1.8 0,1 Z"
+                    fill="#E0392F"
                     stroke="#FFFFFF"
                     strokeWidth={0.8}
+                    strokeLinejoin="round"
                   />
-                  {/* inner white dot */}
-                  <circle cx={0} cy={-7.6} r={1.7} fill="#FFFFFF" />
+                  <circle cx={0} cy={-6.6} r={1.6} fill="#FFFFFF" />
                 </g>
               </Marker>
             );
