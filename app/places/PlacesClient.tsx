@@ -160,7 +160,7 @@ export function PlacesClient() {
             <Section
               title="Allergies"
               subtitle="Listed first on your Previsit Card so clinicians see it before prescribing."
-              icon={<Siren className="h-5 w-5 text-status-banned" />}
+              icon={<Siren className="h-7 w-7 text-status-banned" />}
               action={
                 <Button size="sm" variant="secondary" onClick={addAllergy}>
                   <Plus className="h-4 w-4" /> Add
@@ -187,7 +187,7 @@ export function PlacesClient() {
             <Section
               title="Anatomical Inventory"
               subtitle="What's actually in your body now. Cuts through gendered EHR defaults so the right screenings get ordered."
-              icon={<ScanLine className="h-5 w-5 text-accent" />}
+              icon={<ScanLine className="h-7 w-7 text-accent" />}
             >
               <textarea
                 value={profile.anatomical_inventory}
@@ -647,7 +647,7 @@ function DrugSafety({ medications }: { medications: Medication[] }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-accent" />
+            <ShieldCheck className="h-7 w-7 text-accent" />
             <h2 className="text-subsection">Drug Safety Check</h2>
           </div>
           <p className="mt-1 text-meta text-ink-secondary">
