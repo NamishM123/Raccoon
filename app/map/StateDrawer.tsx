@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ExternalLink, FileText, Loader2, X, AlertTriangle, MessageCircle, ShieldCheck, ArrowUp } from "lucide-react";
+import { ChevronDown, ExternalLink, FileText, Loader2, X, AlertTriangle, MessageCircle, ShieldCheck, ArrowUp, BookOpen } from "lucide-react";
 import { StatusPill } from "@/components/Pill";
 import { Button } from "@/components/Button";
 import { PROCEDURE_KEYS, PROCEDURE_LABELS } from "@/data/care_status";
@@ -13,7 +13,10 @@ import {
 } from "@/data/insurance_coverage";
 import {
   VERIFIED_SOURCES_BY_PROCEDURE,
-  REDDIT_QUERY_BY_PROCEDURE,
+  REDDIT_QUERIES_BY_PROCEDURE,
+  SUMMARY_BY_PROCEDURE,
+  FALLBACK_REDDIT_BY_PROCEDURE,
+  type SampleReview,
 } from "@/data/verified_sources";
 import type { ProcedureKey, StateCareData } from "@/types";
 
@@ -300,6 +303,8 @@ function ProcedureRow({
       </button>
       {open && (
         <div className="px-4 pb-4 text-meta text-ink-secondary border-t divider-soft pt-3 space-y-3">
+          <ClinicalSummary procedure={procedure} />
+
           {combined !== data.status && (
             <div className="flex items-center gap-2 text-ink-primary">
               <span>Procedure legality:</span>
@@ -369,27 +374,59 @@ function timeAgo(unixSeconds: number): string {
   return `${value}${label} ago`;
 }
 
+function ClinicalSummary({ procedure }: { procedure: ProcedureKey }) {
+  const summary = SUMMARY_BY_PROCEDURE[procedure];
+  if (!summary) return null;
+  return (
+    <div className="rounded-btn border border-divider/60 bg-accent/5 px-3 py-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <BookOpen className="h-4 w-4 text-accent" />
+        <span className="text-ink-primary font-medium">
+          What this procedure is
+        </span>
+      </div>
+      <p className="text-meta text-ink-secondary leading-relaxed">{summary}</p>
+      <p className="mt-1.5 text-[11px] text-ink-secondary">
+        Synthesised from the verified sources below.
+      </p>
+    </div>
+  );
+}
+
 function RedditReviews({ procedure }: { procedure: ProcedureKey }) {
   const [open, setOpen] = useState(false);
   const [posts, setPosts] = useState<RedditReview[]>([]);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   useEffect(() => {
     if (!open || loaded || busy) return;
     setBusy(true);
-    setError(null);
-    const q = REDDIT_QUERY_BY_PROCEDURE[procedure];
-    fetch(`/api/reddit?q=${encodeURIComponent(q)}`)
+    const queries = REDDIT_QUERIES_BY_PROCEDURE[procedure] ?? [];
+    const params = queries
+      .map((q) => `q=${encodeURIComponent(q)}`)
+      .join("&");
+    fetch(`/api/reddit?${params}`)
       .then((r) => r.json())
       .then((d) => {
-        setPosts(Array.isArray(d?.posts) ? d.posts : []);
+        const live: RedditReview[] = Array.isArray(d?.posts) ? d.posts : [];
+        if (live.length > 0) {
+          setPosts(live);
+          setUsedFallback(false);
+        } else {
+          setUsedFallback(true);
+        }
         setLoaded(true);
       })
-      .catch(() => setError("Couldn't reach Reddit."))
+      .catch(() => {
+        setUsedFallback(true);
+        setLoaded(true);
+      })
       .finally(() => setBusy(false));
   }, [open, loaded, busy, procedure]);
+
+  const fallback: SampleReview[] = FALLBACK_REDDIT_BY_PROCEDURE[procedure] ?? [];
 
   return (
     <div className="rounded-btn border border-divider/60 bg-surface/60">
@@ -413,54 +450,77 @@ function RedditReviews({ procedure }: { procedure: ProcedureKey }) {
       </button>
       {open && (
         <div className="px-3 pb-3 pt-1 space-y-2">
-          {error && (
-            <p className="text-meta text-status-banned">{error}</p>
-          )}
-          {loaded && !error && posts.length === 0 && (
-            <p className="text-meta text-ink-secondary">
-              No matching experience posts found right now.
-            </p>
-          )}
-          {posts.map((p) => (
-            <a
-              key={p.id}
-              href={p.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block rounded-btn border border-divider bg-white/70 hover:bg-white px-3 py-2 transition-colors"
-            >
-              <div className="flex items-center gap-2 text-[11px] text-ink-secondary">
-                <span className="font-bold text-[#FF4500]">r/{p.subreddit}</span>
-                <span>·</span>
-                <span>u/{p.author}</span>
-                {p.created_utc > 0 && (
-                  <>
-                    <span>·</span>
-                    <span>{timeAgo(p.created_utc)}</span>
-                  </>
-                )}
-              </div>
-              <p className="mt-1 text-body text-ink-primary leading-snug">
-                {p.title}
-              </p>
-              {p.snippet && (
-                <p className="mt-1 text-meta text-ink-secondary leading-snug line-clamp-3">
-                  {p.snippet}
+          {!usedFallback &&
+            posts.map((p) => (
+              <a
+                key={p.id}
+                href={p.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-btn border border-divider bg-white/70 hover:bg-white px-3 py-2 transition-colors"
+              >
+                <div className="flex items-center gap-2 text-[11px] text-ink-secondary">
+                  <span className="font-bold text-[#FF4500]">r/{p.subreddit}</span>
+                  <span>·</span>
+                  <span>u/{p.author}</span>
+                  {p.created_utc > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>{timeAgo(p.created_utc)}</span>
+                    </>
+                  )}
+                </div>
+                <p className="mt-1 text-body text-ink-primary leading-snug">
+                  {p.title}
                 </p>
-              )}
-              <div className="mt-1.5 flex items-center gap-3 text-[11px] text-ink-secondary">
-                <span className="inline-flex items-center gap-0.5">
-                  <ArrowUp className="h-3 w-3" />
-                  {p.score}
-                </span>
-                <span className="inline-flex items-center gap-0.5">
-                  <MessageCircle className="h-3 w-3" />
-                  {p.num_comments}
-                </span>
-              </div>
-            </a>
-          ))}
-          {loaded && posts.length > 0 && (
+                {p.snippet && (
+                  <p className="mt-1 text-meta text-ink-secondary leading-snug line-clamp-3">
+                    {p.snippet}
+                  </p>
+                )}
+                <div className="mt-1.5 flex items-center gap-3 text-[11px] text-ink-secondary">
+                  <span className="inline-flex items-center gap-0.5">
+                    <ArrowUp className="h-3 w-3" />
+                    {p.score}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <MessageCircle className="h-3 w-3" />
+                    {p.num_comments}
+                  </span>
+                </div>
+              </a>
+            ))}
+
+          {usedFallback && fallback.length > 0 && (
+            <>
+              {fallback.map((p, i) => (
+                <div
+                  key={`fb-${i}`}
+                  className="rounded-btn border border-divider bg-white/70 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2 text-[11px] text-ink-secondary">
+                    <span className="font-bold text-[#FF4500]">r/{p.subreddit}</span>
+                    <span>·</span>
+                    <span className="uppercase tracking-wide text-[10px] font-semibold bg-surface-inset text-ink-secondary px-1.5 py-0.5 rounded">
+                      Sample
+                    </span>
+                  </div>
+                  <p className="mt-1 text-body text-ink-primary leading-snug">
+                    {p.title}
+                  </p>
+                  <p className="mt-1 text-meta text-ink-secondary leading-snug">
+                    {p.snippet}
+                  </p>
+                </div>
+              ))}
+              <p className="text-[11px] text-ink-secondary">
+                Reddit didn&apos;t return live posts (rate limited or blocked).
+                These are representative community-style experiences — anecdotal, not medical advice.
+              </p>
+            </>
+          )}
+
+          {!usedFallback && loaded && posts.length > 0 && (
             <p className="text-[11px] text-ink-secondary">
               Source: Reddit public search. Anecdotes — not medical advice.
             </p>
