@@ -47,16 +47,15 @@ export function USMap({
     <div className="relative">
       <ComposableMap projection="geoAlbersUsa" width={980} height={560}>
         <defs>
-          <radialGradient id="centerPin" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#5BA8E8" />
-            <stop offset="60%" stopColor="#1D70B8" />
-            <stop offset="100%" stopColor="#0F4C82" />
-          </radialGradient>
+          <linearGradient id="centerPin" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FF5A4E" />
+            <stop offset="100%" stopColor="#C5221F" />
+          </linearGradient>
           <filter id="centerPinShadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="0.6" />
-            <feOffset dx="0" dy="0.4" result="offsetblur" />
+            <feGaussianBlur in="SourceAlpha" stdDeviation="0.7" />
+            <feOffset dx="0" dy="0.6" result="offsetblur" />
             <feComponentTransfer>
-              <feFuncA type="linear" slope="0.35" />
+              <feFuncA type="linear" slope="0.45" />
             </feComponentTransfer>
             <feMerge>
               <feMergeNode />
@@ -142,30 +141,27 @@ export function USMap({
               >
                 <g
                   filter="url(#centerPinShadow)"
-                  style={{ transition: "transform 0.15s ease-out" }}
-                  transform={isHovered ? "scale(1.35)" : "scale(1)"}
+                  style={{ transition: "transform 0.15s ease-out", transformOrigin: "0 0" }}
+                  transform={isHovered ? "scale(1.25)" : "scale(1)"}
                 >
-                  {/* soft halo */}
-                  <circle
-                    r={6}
-                    fill="#1D70B8"
-                    opacity={isHovered ? 0.22 : 0.14}
+                  {/* ground shadow ellipse under the tip */}
+                  <ellipse
+                    cx={0}
+                    cy={0.6}
+                    rx={2.2}
+                    ry={0.6}
+                    fill="#000"
+                    opacity={0.25}
                   />
-                  {/* main pin */}
-                  <circle
-                    r={3.4}
+                  {/* teardrop pin body — tip at (0,0), head up */}
+                  <path
+                    d="M0,0 C-1.4,-2.8 -4.2,-4.6 -4.2,-7.4 A4.2,4.2 0 1,1 4.2,-7.4 C4.2,-4.6 1.4,-2.8 0,0 Z"
                     fill="url(#centerPin)"
                     stroke="#FFFFFF"
-                    strokeWidth={1}
+                    strokeWidth={0.8}
                   />
-                  {/* inner highlight */}
-                  <circle
-                    r={1.1}
-                    cx={-0.6}
-                    cy={-0.6}
-                    fill="#FFFFFF"
-                    opacity={0.7}
-                  />
+                  {/* inner white dot */}
+                  <circle cx={0} cy={-7.6} r={1.7} fill="#FFFFFF" />
                 </g>
               </Marker>
             );

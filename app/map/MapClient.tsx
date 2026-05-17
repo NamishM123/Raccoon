@@ -142,7 +142,7 @@ export function MapClient() {
                 className="h-4 w-4 rounded border-divider"
               />
               <span className="inline-flex items-center gap-1.5 text-meta text-ink-primary">
-                <MapPin className="h-3.5 w-3.5 text-[#1D70B8]" />
+                <MapPin className="h-3.5 w-3.5 text-[#E0392F]" />
                 Show care centers
               </span>
             </label>
@@ -207,7 +207,7 @@ export function MapClient() {
         {showCenters && (
           <div className="mt-5 text-meta text-ink-secondary leading-relaxed">
             <span className="inline-flex items-center gap-1.5 text-ink-primary">
-              <MapPin className="h-3.5 w-3.5 text-[#1D70B8]" />
+              <MapPin className="h-3.5 w-3.5 text-[#E0392F]" />
               {CARE_CENTERS.length} sample care centers on the map
             </span>{" "}
             · <span className="text-ink-primary">{stats.centersInProtective}</span> sit
@@ -234,7 +234,7 @@ export function MapClient() {
               </Fragment>
             ))}
             <span className="inline-flex items-center gap-2 rounded-chip bg-surface-inset px-3 py-1 text-meta text-ink-primary">
-              <span className="h-2 w-2 rounded-full bg-[#1D70B8] ring-2 ring-white" />
+              <span className="h-2 w-2 rounded-full bg-[#E0392F] ring-2 ring-white" />
               Care center
             </span>
             <span className="text-meta text-ink-secondary">
