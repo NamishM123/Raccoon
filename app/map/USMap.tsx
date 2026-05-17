@@ -7,6 +7,11 @@ import {
   Geography,
 } from "react-simple-maps";
 import { CARE_STATUS_BY_CODE } from "@/data/care_status";
+import {
+  getCombinedStatus,
+  INSURANCE_LABELS,
+  type InsuranceKey,
+} from "@/data/insurance_coverage";
 import { FIPS_TO_STATE, US_TOPOLOGY_URL } from "@/lib/fips";
 import type { CareStatus, ProcedureKey } from "@/types";
 import { statusLabel } from "@/components/Pill";
@@ -21,9 +26,11 @@ const STATUS_FILL: Record<CareStatus, string> = {
 
 export function USMap({
   procedure,
+  insurance,
   onSelect,
 }: {
   procedure: ProcedureKey;
+  insurance: InsuranceKey;
   onSelect: (stateCode: string) => void;
 }) {
   const [hover, setHover] = useState<{
@@ -50,7 +57,9 @@ export function USMap({
               const fips = geo.id;
               const code = FIPS_TO_STATE[fips];
               const state = code ? CARE_STATUS_BY_CODE[code] : null;
-              const status = state?.procedures[procedure].status;
+              const status = state
+                ? getCombinedStatus(state.state_code, insurance, procedure)
+                : undefined;
               const fill = status ? STATUS_FILL[status] : "#E5E5EA";
               const isHovered = hover?.fips === fips;
               return (
@@ -59,8 +68,9 @@ export function USMap({
                   geography={geo}
                   onMouseEnter={(e) => {
                     if (!state || !status) return;
-                    const rect = (e.target as SVGPathElement).getBoundingClientRect();
-                    const parentRect = (e.target as SVGPathElement)
+                    const target = e.target as SVGPathElement;
+                    const rect = target.getBoundingClientRect();
+                    const parentRect = target
                       .closest("svg")
                       ?.getBoundingClientRect();
                     setHover({
@@ -73,7 +83,7 @@ export function USMap({
                     });
                   }}
                   onMouseLeave={() => setHover(null)}
-                  onClick={() => state && onSelect(state.state_code)}
+                  onClick={() => state && status && onSelect(state.state_code)}
                   style={{
                     default: {
                       fill,
@@ -110,7 +120,9 @@ export function USMap({
           style={{ left: hover.x, top: hover.y - 6 }}
         >
           <span className="font-medium">{hover.name}</span>
-          <span className="text-white/70"> · {statusLabel(hover.status)}</span>
+          <span className="text-white/70">
+            {" "}· {INSURANCE_LABELS[insurance]} · {statusLabel(hover.status)}
+          </span>
         </div>
       )}
     </div>
