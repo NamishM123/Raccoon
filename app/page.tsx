@@ -102,6 +102,9 @@ function ToolCards() {
       desc: "See where your state stands on gender affirming care, ID changes, and shield laws.",
     },
   ];
+  // Profile feeds every other tool (and Previsit Card hard-blocks without
+  // it), so it leads as an explicit first step rather than one card of six.
+  const [profileTool, ...rest] = tools;
   return (
     <section id="tools" className="relative scroll-mt-24 pb-section">
       <div
@@ -113,8 +116,45 @@ function ToolCards() {
         }}
       />
       <Container className="relative">
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          {tools.map((t) => (
+        <Link
+          href={profileTool.href}
+          className="group relative mb-5 flex items-center gap-5 glass rounded-card p-6 sm:p-7 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-cardHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-deep focus-visible:ring-offset-2"
+          style={{ backgroundColor: "rgba(255,255,255,0.72)" }}
+        >
+          <div
+            className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-icon text-sea-ink"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(224,242,254,0.95) 0%, rgba(186,230,253,0.75) 50%, rgba(125,211,252,0.55) 100%)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.5), 0 1px 2px rgba(15,42,61,0.06)",
+            }}
+          >
+            <profileTool.icon className="h-7 w-7" strokeWidth={1.75} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-sea-deep">
+              Start here &middot; Step 1
+            </div>
+            <h3 className="mt-1 text-[19px] font-bold tracking-tight text-sea-ink">
+              {profileTool.title}
+            </h3>
+            <p className="mt-1 text-meta text-ink-secondary leading-relaxed">
+              {profileTool.desc}
+            </p>
+          </div>
+          <div className="hidden shrink-0 items-center gap-1.5 text-meta font-medium text-sea-ink transition-colors duration-200 group-hover:text-sea-deep sm:inline-flex">
+            Open
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
+          </div>
+        </Link>
+
+        <div className="mb-3 text-meta uppercase tracking-[0.12em] text-ink-secondary">
+          Then, use any tool
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {rest.map((t) => (
             <Link
               key={t.href}
               href={t.href}
