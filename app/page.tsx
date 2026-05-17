@@ -118,8 +118,7 @@ function ToolCards() {
       <Container className="relative">
         <Link
           href={profileTool.href}
-          className="group relative mb-5 flex items-center gap-5 glass rounded-card p-6 sm:p-7 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-cardHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-deep focus-visible:ring-offset-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.72)" }}
+          className="group relative mb-8 flex items-center gap-5 glass-strong rounded-card p-6 sm:p-7 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-cardHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-deep focus-visible:ring-offset-2"
         >
           <div
             className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-icon text-sea-ink"
@@ -143,22 +142,29 @@ function ToolCards() {
               {profileTool.desc}
             </p>
           </div>
-          <div className="hidden shrink-0 items-center gap-1.5 text-meta font-medium text-sea-ink transition-colors duration-200 group-hover:text-sea-deep sm:inline-flex">
-            Open
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
+          <div className="shrink-0">
+            <span className="inline-flex items-center gap-1.5 rounded-chip bg-sea-foam/70 px-3 py-2 text-meta font-semibold text-sea-ink whitespace-nowrap transition-colors duration-200 group-hover:bg-sea-mist/70 sm:px-4">
+              <span className="hidden sm:inline">Open</span>
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 ease-out group-hover:translate-x-1" />
+            </span>
           </div>
         </Link>
 
-        <div className="mb-3 text-meta uppercase tracking-[0.12em] text-ink-secondary">
-          Then, use any tool
+        <div className="mb-5">
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-sea-deep">
+            Step 2
+          </div>
+          <h2 className="mt-1 text-[19px] font-bold tracking-tight text-sea-ink">
+            Use any tool, in any order
+          </h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {rest.map((t) => (
             <Link
               key={t.href}
               href={t.href}
-              className="group relative flex flex-col glass rounded-card p-5 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-cardHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-deep focus-visible:ring-offset-2"
+              className="group relative flex flex-col glass rounded-card p-6 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-cardHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-deep focus-visible:ring-offset-2"
             >
               {/* Icon */}
               <div
